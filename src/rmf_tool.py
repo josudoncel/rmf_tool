@@ -1,9 +1,10 @@
 import numpy as np
 import random as rnd
 import scipy.integrate as integrate
-# from numpy import array
-# from random import random, expovariate
-# from scipy.integrate import odeint
+import sympy as sym
+import scipy.linalg 
+import numpy.linalg 
+
 
 class RmfError(Exception):
     """Basic error class for this module
@@ -116,13 +117,56 @@ class DDPP():
         return(T,X)
 
         
-    def fixed_point(self,x0=None):
+    def fixed_point(self):
         """Computes the fixed of the ODE (if this ODE has a fixed point starting from x0)
         """
-        return(self.ode(1000)[0][-1,:])
+        return(self.ode(1000)[1][-1,:])
 
     def theoretical_C(self):
-        raise NotImplemented
+        n = self._model_dimension
+        number_transitions = len(self._list_of_transitions)
+        Xstar = self.fixed_point()
+    
+        Var=np.array([sym.symbols('x_{}'.format(i)) for i in range(n)])
+    
+        f_x=np.zeros(n)
+        for i in range(number_transitions):
+            f_x = f_x + self._list_of_transitions[i]*self._list_of_rate_functions[i](Var)
+        
+        print('SOMETHING TO BE DONE HERE')
+        dim = n-1
+        for i in range(n):
+            f_x[i]=f_x[i].subs(Var[-1],1-sum(array([Var[i] for i in range(n-1)])))
+        
+        A=array([[sym.lambdify(Var ,sym.diff(f_x[i],Var[j]))(*[Xstar[k]
+                                                               for k in range(n)]) 
+                  for j in range(dim)]
+                 for i in range(dim)])
 
+        B=array([[[sym.lambdify(Var,sym.diff(f_x[j],Var[k],Var[l]))(*[Xstar[i] 
+                                                                      for i in range(n)]) 
+                   for l in range(dim)] 
+                  for k in range(dim)] 
+                 for j in range(dim)])
+        
+        Q=array([[0. for i in range(dim)] for j in range(dim)])
+
+        for l in range(number_transitions):
+            Q += array([[self._list_of_transitions[l][p]*self._list_of_transitions[l][m]*
+                         self._list_of_rate_functions[l](Xstar)
+                         for m in range(dim)]
+                    for p in range(dim)])
+
+        W = scipy.linalg.solve_lyapunov(A,Q)
+        A_inv=numpy.linalg.inv(A)
+    
+        C=[ 0.5*sum([A_inv[i][j]*sum(array([[B[j][k_1][k_2]*W[k_1][k_2] 
+                                             for k_2 in range(dim)] 
+                                            for k_1 in range(dim)])) 
+                     for j in range(dim)]) 
+            for i in range(dim)]
+        return(np.sum(C,1))
+    
+    
     def compare_ODE_simulation():
         raise NotImplemented
