@@ -3,7 +3,8 @@ import random as rnd
 import scipy.integrate as integrate
 import sympy as sym
 import scipy.linalg 
-import numpy.linalg 
+import numpy.linalg
+import matplotlib.pyplot as plt
 
 
 class RmfError(Exception):
@@ -168,5 +169,10 @@ class DDPP():
         return(np.sum(C,1))
     
     
-    def compare_ODE_simulation():
-        raise NotImplemented
+    def compare_ODE_simulation(self):
+        T,X = self.simulate(N=1000,time=10)
+        plt.plot(T,X)
+        plt.gca().set_prop_cycle(None)
+        T,X = self.ode(time=10)
+        plt.plot(T,X,'--')
+        plt.legend(['x_{}'.format(i) for i in range(self._model_dimension)])
