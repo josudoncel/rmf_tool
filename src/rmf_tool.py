@@ -169,8 +169,8 @@ class DDPP():
         return(np.sum(C,1))
     
     
-    def compare_ODE_simulation(self):
-        T,X = self.simulate(N=1000,time=10)
+    def compare_ODE_simulation(self,N):
+        T,X = self.simulate(N,time=10)
         plt.plot(T,X)
         plt.gca().set_prop_cycle(None)
         T,X = self.ode(time=10)
