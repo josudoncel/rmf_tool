@@ -1,5 +1,9 @@
-from numpy import array
-from random import random, expovariate
+import numpy as np
+import random as rnd
+import scipy.integrate as integrate
+# from numpy import array
+# from random import random, expovariate
+# from scipy.integrate import odeint
 
 class RmfError(Exception):
     """Basic error class for this module
@@ -47,7 +51,7 @@ class DDPP():
         if self._model_dimension != None and self._model_dimension != len(l):
             raise DimensionError
         self._model_dimension = len(l)
-        self._list_of_transitions.append(array(l))
+        self._list_of_transitions.append(np.array(l))
         self._list_of_rate_functions.append(f)
 
     def set_initial_state(self,x0):
@@ -73,7 +77,7 @@ class DDPP():
         t=0
     
         #if fix!=-1:     seed(fix)
-        x = array(self._x0)
+        x = np.array(self._x0)
         T = [0]
         X = [x]
         while t<time:
@@ -83,7 +87,7 @@ class DDPP():
                 print('System stalled (total rate = 0)')
                 t = time
             else:
-                a=random()*S
+                a=rnd.random()*S
                 l=0
                 while a > L_poids[l]:
                     a -= L_poids[l]
@@ -91,18 +95,24 @@ class DDPP():
         
                 x = x+(1./N)*self._list_of_transitions[l]
 
-                t+=expovariate(N*S)
+                t+=rnd.expovariate(N*S)
             
             T.append(t)
             X.append(x)
     
-        X = array(X)
+        X = np.array(X)
         return(T,X)
     
-    def ode(self,x0=None):
+    def ode(self,time,number_of_steps=1000):
         """Simulates the ODE (mean-field approximation)
         """
-        raise NotImplemented
+        def drift(x):
+            return (sum([self._list_of_transitions[i]*self._list_of_rate_functions[i](x) for i in range(len(self._list_of_transitions))],0))
+        
+        T = np.linspace(0,time,number_of_steps)
+        X = integrate.odeint( lambda x,t : drift(x), self._x0, T)
+        return(T,X)
+
         
     def fixed_point(self,x0=None):
         """Computes the fixed of the ODE (if this ODE has a fixed point starting from x0)
