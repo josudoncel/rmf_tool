@@ -106,6 +106,8 @@ class DDPP():
     def ode(self,time,number_of_steps=1000):
         """Simulates the ODE (mean-field approximation)
         """
+        if self._x0 == None:
+            raise InitialConditionNotDefined
         def drift(x):
             return (sum([self._list_of_transitions[i]*self._list_of_rate_functions[i](x) for i in range(len(self._list_of_transitions))],0))
         
@@ -117,7 +119,7 @@ class DDPP():
     def fixed_point(self,x0=None):
         """Computes the fixed of the ODE (if this ODE has a fixed point starting from x0)
         """
-        raise NotImplemented
+        return(self.ode(1000)[0][-1,:])
 
     def theoretical_C(self):
         raise NotImplemented
