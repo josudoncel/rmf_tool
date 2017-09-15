@@ -123,6 +123,16 @@ class DDPP():
         """
         return(self.ode(1000)[1][-1,:])
 
+    def doTransitionsConserveSum(self):
+        """This function tests if the transitions conserve the sum of the coordinates.
+
+        Returns : True or False.
+        """
+        for l in self._list_of_transitions:
+            if sum(l) != 0:
+                return False
+        return(True)
+
     def theoretical_C(self):
         n = self._model_dimension
         number_transitions = len(self._list_of_transitions)
@@ -134,10 +144,12 @@ class DDPP():
         for i in range(number_transitions):
             f_x = f_x + self._list_of_transitions[i]*self._list_of_rate_functions[i](Var)
         
-        print('SOMETHING TO BE DONE HERE')
-        dim = n-1
-        for i in range(n):
-            f_x[i]=f_x[i].subs(Var[-1],1-sum(array([Var[i] for i in range(n-1)])))
+        if self.doTransitionsConserveSum():
+            dim = n-1
+            for i in range(n):
+                f_x[i]=f_x[i].subs(Var[-1],sum(self._x0)-sum(array([Var[i] for i in range(n-1)])))
+        else:
+            dim=n
         
         A=array([[sym.lambdify(Var ,sym.diff(f_x[i],Var[j]))(*[Xstar[k]
                                                                for k in range(n)]) 
@@ -166,13 +178,61 @@ class DDPP():
                                             for k_1 in range(dim)])) 
                      for j in range(dim)]) 
             for i in range(dim)]
-        return(np.sum(C,1))
+        C = np.sum(C,1)
+        if dim == n-1:
+            C = list(C)
+            C.append(-sum(C))
+        return(np.array(C))
+
     
+    def steady_state_simulation(self,N,time=1000):
+        """Generates a sample of E[X] in steady-state.
+
+        The expectation is computed by performing one simulation from
+        t=0 to t=time and averaging the values over time/2 .. time
+        (the implicit assumption is that the system should be roughly
+        in steady-state at time/2).
+
+        """
+        T,X = self.simulate(N,time)
+        n = len(T)
+        n2 = int(n/2)
+        return(np.array([np.sum(np.diff(T[n2:n])*X[n2+1:n,i]) / (T[n-1]-T[n2]) for i in range(len(X[0,:]))]))
+        
+    def compare_refinedMF(self,N,time=1000):
+        """Compare E[X] with its mean-field and refined mean-field approximation  
+
+        Args : 
+             N (int) : system's size
+             time : Computes the expectation by
+
+        Return : (Xs,Xm,Xrmf) where: 
+             Xs is an approximation E[X] (computed by simulation)
+             Xm is the fixed point of the mean-field approximation 
+             Xrmf = Xm + C/N
+        
+        """
+        Xs = self.steady_state_simulation(N,time)
+        Xm = self.fixed_point()
+        C = self.theoretical_C()
+        Xrmf = Xm+C/N
+        return(Xs,Xm,Xrmf)
     
-    def compare_ODE_simulation(self,N):
+    def plot_ODE_vs_simulation(self,N,time=10):
+        """Plot the ODE and the simulation on the same graph
+        
+        The system is simulated from t=0 to t=time (both for the
+        stochastic and ODE version), starting from x0. 
+        
+        Args: 
+             N (int) : system's size
+             time : the time until the simulation should be run
+
+        """
         T,X = self.simulate(N,time=10)
         plt.plot(T,X)
         plt.gca().set_prop_cycle(None)
         T,X = self.ode(time=10)
         plt.plot(T,X,'--')
         plt.legend(['x_{}'.format(i) for i in range(self._model_dimension)])
+
