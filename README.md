@@ -12,7 +12,11 @@ approximation and its refined mean-field approximation.
 
 ### List of fonctions available 
 
-For now, the documentation is mostly contained in the examples below. 
+Most of the functions are documented and their documentation is
+accessible by the "help" command.
+
+Apart from that, the documentation is mostly contained in the examples
+below (from basic to more advanced). 
 
 ### Examples
 
