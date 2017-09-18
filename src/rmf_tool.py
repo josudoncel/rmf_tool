@@ -263,4 +263,4 @@ class DDPP():
         plt.legend(['x_{}'.format(i) for i in range(self._model_dimension)])
         plt.xlabel('Time')
         plt.ylabel('x_{i}')
-
+        plt.show()
