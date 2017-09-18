@@ -14,9 +14,11 @@ class DimensionError(RmfError):
     pass
 class NotImplemented(RmfError):
     pass
-
+class NegativeRate(RmfError):
+    pass
 class InitialConditionNotDefined(RmfError):
     pass
+
 class DDPP():
     """ DDPP serves to define and study density depend population processes
     
@@ -50,7 +52,7 @@ class DDPP():
         Raises: 
             DimensionError if l is not of the right size.
         """
-        if self._model_dimension != None and self._model_dimension != len(l):
+        if self._model_dimension is not None and self._model_dimension != len(l):
             raise DimensionError
         self._model_dimension = len(l)
         self._list_of_transitions.append(np.array(l))
@@ -73,7 +75,7 @@ class DDPP():
         """
         if N=='inf':
             return(ode(time))
-        if self._x0 == None :
+        if self._x0 is None :
             raise InitialConditionNotDefined 
         nb_trans=len(self._list_of_transitions)
         t=0
@@ -83,16 +85,18 @@ class DDPP():
         T = [0]
         X = [x]
         while t<time:
-            L_poids=[self._list_of_rate_functions[i](x) for i in range(nb_trans)]
-            S=sum(L_poids)
+            L_rates=[self._list_of_rate_functions[i](x) for i in range(nb_trans)]
+            if any(rate<-1e-14 for rate in L_rates):
+               raise NegativeRate
+            S=sum(L_rates)
             if S<=1e-14:
                 print('System stalled (total rate = 0)')
                 t = time
             else:
                 a=rnd.random()*S
                 l=0
-                while a > L_poids[l]:
-                    a -= L_poids[l]
+                while a > L_rates[l]:
+                    a -= L_rates[l]
                     l += 1
         
                 x = x+(1./N)*self._list_of_transitions[l]
@@ -108,7 +112,7 @@ class DDPP():
     def ode(self,time,number_of_steps=1000):
         """Simulates the ODE (mean-field approximation)
         """
-        if self._x0 == None:
+        if self._x0 is None:
             raise InitialConditionNotDefined
         def drift(x):
             return (sum([self._list_of_transitions[i]*self._list_of_rate_functions[i](x) for i in range(len(self._list_of_transitions))],0))
