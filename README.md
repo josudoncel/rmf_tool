@@ -64,4 +64,4 @@ This library depends on the following python library:
 * sympy 
 * matplotlib.pyplot
 
-**Copyright 2017. Authors : Nicolas Gast, Emmanuel Rodriguez. **
+**Copyright** 2017. **Authors** : Nicolas Gast, Emmanuel Rodriguez.
