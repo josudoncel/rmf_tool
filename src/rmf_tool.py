@@ -125,6 +125,10 @@ class DDPP():
     def fixed_point(self):
         """Computes the fixed of the ODE (if this ODE has a fixed point starting from x0)
         """
+        if self._x0 is None:
+            print('No initial condition given. We assume that the initial condition is "x0=[1,0,...]"')
+            self._x0 = np.zeros(self._model_dimension)
+            self._x0[0] = 1
         return(self.ode(time=10000,number_of_steps=10)[1][-1,:])
 
     def doTransitionsConserveSum(self):
@@ -138,6 +142,8 @@ class DDPP():
         return(True)
 
     def theoretical_C(self):
+        """ To be written 
+        """
         n = self._model_dimension
         number_transitions = len(self._list_of_transitions)
         Xstar = self.fixed_point()
