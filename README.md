@@ -1,4 +1,3 @@
-**Work in progress**
 
 # Density dependent population processes and refined mean-field approximation
 
@@ -64,3 +63,5 @@ This library depends on the following python library:
 * scipy
 * sympy 
 * matplotlib.pyplot
+
+**Copyright 2017. Authors : Nicolas Gast, Emmanuel Rodriguez. **
