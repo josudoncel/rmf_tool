@@ -14,7 +14,7 @@ approximation and its refined mean-field approximation.
 
 ## Documentation
 
-A density dependent process is a Markov chain that evolve in a sub-domain of $R^d$ are where the transition are given by a set $L$ and a list of rate-functions \beta_l. To a system size N is associated a Markov chain whose transitions are (for all $\ell\in L$):
+A density dependent process is a Markov chain that evolve in a sub-domain of $R^d$ are where the transition are given by a set $L$ and a list of rate-functions $\beta_l$. To a system size N is associated a Markov chain whose transitions are (for all $\ell\in L$):
 
 * $x \mapsto x + \frac 1N \ell$ at rate $\beta_\ell(x)$
 
@@ -32,14 +32,14 @@ below (from basic to more advanced).
 
 ### Computation time
 
-The computation of the function 'theoretical_C' grows as d^3, where d is the dimension of the model. It takes about 5 second for a 50-dimensional system, about 40 seconds for a 100-dimensional system.
+The computation of the function 'theoretical_C' grows as d^3, where d is the dimension of the model. It takes about 5 second for a 50-dimensional system, about 40 seconds for a 100-dimensional system. Note that for large models, most of the time is taken by the computation of the symbolic derivatives. 
 
 The simulation of the underlying Markov chain is not optimized and therefore might be slow for large models. 
 
 ### Examples
 
 ### Small example :
-The following code define a $2$-dimensional model and plot the mean-field approximation versus one sample trajectory.
+The following code define a 2-dimensional model and plot the mean-field approximation versus one sample trajectory.
 
 ```
 import src.rmf_tool as rmf
