@@ -125,7 +125,7 @@ class DDPP():
     def fixed_point(self):
         """Computes the fixed of the ODE (if this ODE has a fixed point starting from x0)
         """
-        return(self.ode(1000)[1][-1,:])
+        return(self.ode(time=10000,number_of_steps=10)[1][-1,:])
 
     def doTransitionsConserveSum(self):
         """This function tests if the transitions conserve the sum of the coordinates.
@@ -143,7 +143,6 @@ class DDPP():
         Xstar = self.fixed_point()
     
         Var=np.array([sym.symbols('x_{}'.format(i)) for i in range(n)])
-    
         f_x=np.zeros(n)
         for i in range(number_transitions):
             f_x = f_x + self._list_of_transitions[i]*self._list_of_rate_functions[i](Var)
@@ -154,18 +153,21 @@ class DDPP():
                 f_x[i]=f_x[i].subs(Var[-1],sum(self._x0)-sum(np.array([Var[i] for i in range(n-1)])))
         else:
             dim=n
-        
-        A=np.array([[sym.lambdify(Var ,sym.diff(f_x[i],Var[j]))(*[Xstar[k]
-                                                               for k in range(n)]) 
+        dF = [[sym.diff(f_x[i],Var[j]) for j in range(dim)] for i in range(dim)]
+        subs_dictionary = {Var[i]:Xstar[i] for i in range(dim)}
+        A=np.array([[float(dF[i][j].evalf(subs=subs_dictionary))
                   for j in range(dim)]
                  for i in range(dim)])
-
-        B=np.array([[[sym.lambdify(Var,sym.diff(f_x[j],Var[k],Var[l]))(*[Xstar[i] 
-                                                                      for i in range(n)]) 
-                   for l in range(dim)] 
-                  for k in range(dim)] 
-                 for j in range(dim)])
-        
+        # !!! REGARDER ICI POUR L'EFFICACITE !!!
+        # B=np.array([[[sym.lambdify(Var,sym.diff(f_x[j],Var[k],Var[l]))(*[Xstar[i] 
+        #                                                               for i in range(n)]) 
+        #            for l in range(dim)] 
+        #           for k in range(dim)] 
+        #          for j in range(dim)])
+        B=np.array([[[float(sym.diff(dF[j][k],Var[l]).evalf(subs=subs_dictionary) ) 
+                      for l in range(dim)]
+                     for k in range(dim)]
+                    for j in range(dim)])
         Q=np.array([[0. for i in range(dim)] for j in range(dim)])
 
         for l in range(number_transitions):
@@ -176,11 +178,11 @@ class DDPP():
 
         W = scipy.linalg.solve_lyapunov(A,Q)
         A_inv=numpy.linalg.inv(A)
-    
-        C=[ 0.5*sum([A_inv[i][j]*sum(np.array([[B[j][k_1][k_2]*W[k_1][k_2] 
-                                             for k_2 in range(dim)] 
-                                            for k_1 in range(dim)])) 
-                     for j in range(dim)]) 
+        BtimesW = [sum(np.array([[B[j][k_1][k_2]*W[k_1][k_2] 
+                           for k_2 in range(dim)] 
+                          for k_1 in range(dim)])) for j in range(dim)]
+                
+        C=[ 0.5*sum([A_inv[i][j]* BtimesW[j] for j in range(dim)]) 
             for i in range(dim)]
         C = np.sum(C,1)
         if dim == n-1:
