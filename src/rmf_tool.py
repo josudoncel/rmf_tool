@@ -147,25 +147,25 @@ class DDPP():
         if self.doTransitionsConserveSum():
             dim = n-1
             for i in range(n):
-                f_x[i]=f_x[i].subs(Var[-1],sum(self._x0)-sum(array([Var[i] for i in range(n-1)])))
+                f_x[i]=f_x[i].subs(Var[-1],sum(self._x0)-sum(np.array([Var[i] for i in range(n-1)])))
         else:
             dim=n
         
-        A=array([[sym.lambdify(Var ,sym.diff(f_x[i],Var[j]))(*[Xstar[k]
+        A=np.array([[sym.lambdify(Var ,sym.diff(f_x[i],Var[j]))(*[Xstar[k]
                                                                for k in range(n)]) 
                   for j in range(dim)]
                  for i in range(dim)])
 
-        B=array([[[sym.lambdify(Var,sym.diff(f_x[j],Var[k],Var[l]))(*[Xstar[i] 
+        B=np.array([[[sym.lambdify(Var,sym.diff(f_x[j],Var[k],Var[l]))(*[Xstar[i] 
                                                                       for i in range(n)]) 
                    for l in range(dim)] 
                   for k in range(dim)] 
                  for j in range(dim)])
         
-        Q=array([[0. for i in range(dim)] for j in range(dim)])
+        Q=np.array([[0. for i in range(dim)] for j in range(dim)])
 
         for l in range(number_transitions):
-            Q += array([[self._list_of_transitions[l][p]*self._list_of_transitions[l][m]*
+            Q += np.array([[self._list_of_transitions[l][p]*self._list_of_transitions[l][m]*
                          self._list_of_rate_functions[l](Xstar)
                          for m in range(dim)]
                     for p in range(dim)])
@@ -173,7 +173,7 @@ class DDPP():
         W = scipy.linalg.solve_lyapunov(A,Q)
         A_inv=numpy.linalg.inv(A)
     
-        C=[ 0.5*sum([A_inv[i][j]*sum(array([[B[j][k_1][k_2]*W[k_1][k_2] 
+        C=[ 0.5*sum([A_inv[i][j]*sum(np.array([[B[j][k_1][k_2]*W[k_1][k_2] 
                                              for k_2 in range(dim)] 
                                             for k_1 in range(dim)])) 
                      for j in range(dim)]) 
@@ -184,7 +184,18 @@ class DDPP():
             C.append(-sum(C))
         return(np.array(C))
 
+
+    def _batch_meanConfidenceInterval(self,T,X):
+        n = len(T)
+        if len(T)<300:  # We do not do batch if we have less than 200 samples
+            return(np.sum(np.diff(T[int(n/2):n])*X[int(n/2):n-1]) / (T[n-1]-T[int(n/2)]),None)
+        # Otherwise we split the data into 100 batchs of size 
+        Y = [np.sum(np.diff(T[int(2*i*n/300):int((2*i+1)*n/300)])*
+                    X[int(2*i*n/300):int((2*i+1)*n/300)-1] /
+                    (T[int((2*i+1)*n/300)]-T[int(2*i*n/300)])) for i in range(50,150)]
+        return (np.mean(Y),2*np.std(Y)/10)
     
+                                      
     def steady_state_simulation(self,N,time=1000):
         """Generates a sample of E[X] in steady-state.
 
@@ -197,7 +208,9 @@ class DDPP():
         T,X = self.simulate(N,time)
         n = len(T)
         n2 = int(n/2)
-        return(np.array([np.sum(np.diff(T[n2:n])*X[n2+1:n,i]) / (T[n-1]-T[n2]) for i in range(len(X[0,:]))]))
+        result = np.array([self._batch_meanConfidenceInterval(T,X[:,i]) for i in range(len(X[0,:]))])
+        return(result[:,0],result[:,1])
+        # return(np.array([np.sum(np.diff(T[n2:n])*X[n2+1:n,i]) / (T[n-1]-T[n2]) for i in range(len(X[0,:]))]))
         
     def compare_refinedMF(self,N,time=1000):
         """Compare E[X] with its mean-field and refined mean-field approximation  
@@ -206,17 +219,18 @@ class DDPP():
              N (int) : system's size
              time : Computes the expectation by
 
-        Return : (Xs,Xm,Xrmf) where: 
-             Xs is an approximation E[X] (computed by simulation)
+        Return : (Xm,Xrmf,Xs,Vs) where: 
              Xm is the fixed point of the mean-field approximation 
              Xrmf = Xm + C/N
+             Xs is an approximation E[X] (computed by simulation)
+             Vs is an estimation of the variance
         
         """
-        Xs = self.steady_state_simulation(N,time)
         Xm = self.fixed_point()
         C = self.theoretical_C()
         Xrmf = Xm+C/N
-        return(Xs,Xm,Xrmf)
+        Xs,Vs = self.steady_state_simulation(N,time)
+        return(Xm,Xrmf,Xs,Vs)
     
     def plot_ODE_vs_simulation(self,N,time=10):
         """Plot the ODE and the simulation on the same graph
@@ -235,4 +249,6 @@ class DDPP():
         T,X = self.ode(time=10)
         plt.plot(T,X,'--')
         plt.legend(['x_{}'.format(i) for i in range(self._model_dimension)])
+        plt.xlabel('Time')
+        plt.ylabel('x_{i}')
 
