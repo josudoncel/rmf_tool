@@ -1,6 +1,6 @@
 **Work in progress**
 
-# Simulation and calcul of Random Systems
+# Density dependent population processes and refined mean-field approximation
 
 
 This python librarie implements an algorithm to simulate and study a
