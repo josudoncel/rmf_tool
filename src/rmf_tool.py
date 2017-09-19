@@ -164,12 +164,6 @@ class DDPP():
         A=np.array([[float(dF[i][j].evalf(subs=subs_dictionary))
                   for j in range(dim)]
                  for i in range(dim)])
-        # !!! REGARDER ICI POUR L'EFFICACITE !!!
-        # B=np.array([[[sym.lambdify(Var,sym.diff(f_x[j],Var[k],Var[l]))(*[Xstar[i] 
-        #                                                               for i in range(n)]) 
-        #            for l in range(dim)] 
-        #           for k in range(dim)] 
-        #          for j in range(dim)])
         B=np.array([[[float(sym.diff(dF[j][k],Var[l]).evalf(subs=subs_dictionary) ) 
                       for l in range(dim)]
                      for k in range(dim)]
@@ -222,7 +216,6 @@ class DDPP():
         n2 = int(n/2)
         result = np.array([self._batch_meanConfidenceInterval(T,X[:,i]) for i in range(len(X[0,:]))])
         return(result[:,0],result[:,1])
-        # return(np.array([np.sum(np.diff(T[n2:n])*X[n2+1:n,i]) / (T[n-1]-T[n2]) for i in range(len(X[0,:]))]))
         
     def compare_refinedMF(self,N,time=1000):
         """Compare E[X] with its mean-field and refined mean-field approximation  
