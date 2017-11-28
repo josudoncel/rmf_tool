@@ -176,7 +176,7 @@ class DDPP():
                          for m in range(dim)]
                     for p in range(dim)])
 
-        W = scipy.linalg.solve_lyapunov(A,Q)
+        W = scipy.linalg.solve_continuous_lyapunov(A,Q)
         A_inv=numpy.linalg.inv(A)
         BtimesW = [sum(np.array([[B[j][k_1][k_2]*W[k_1][k_2] 
                            for k_2 in range(dim)] 
