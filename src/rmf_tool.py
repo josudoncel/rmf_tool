@@ -141,6 +141,27 @@ class DDPP():
                 return False
         return(True)
 
+    def test_for_linear_dependencies(self):
+        """This function tests if there the transition conserve some subset of the space. 
+        
+        Return (dim, subs) where
+        * dim is the rank of the matrix of transitions
+        * subs corresponds to the null space of the transitions"""
+        
+        M = np.array([l for l in self._list_of_transitions])
+        u,d,v = np.linalg.svd(M,full_matrices=False)
+        dim = sum(abs(d) > 1e-8)
+        if dim < self._model_dimension:
+            v = v[dim:]
+            p,l,u = scipy.linalg.lu(v)
+            subs=u
+            for i in range(subs.shape[0]):
+                j = np.argmax( abs(subs[i,:])>1e-5)
+                subs[i,:] = subs[i,:] / subs[i,j]
+        else:
+            subs = np.array([])
+        return(dim,subs)
+
     def theoretical_C(self):
         """ To be written 
         """
@@ -152,15 +173,22 @@ class DDPP():
         f_x=np.zeros(n)
         for i in range(number_transitions):
             f_x = f_x + self._list_of_transitions[i]*self._list_of_rate_functions[i](Var)
-        
-        if self.doTransitionsConserveSum():
-            dim = n-1
+
+
+        # The following code attempts to reduce the number of dimensions by testing
+        # if the transitions conserve some linear combinations of the coordinates
+        (dim,subs) = self.test_for_linear_dependencies()
+        variables = [i for i in range(n)]
+        for sub in range(subs.shape[0]):
+            j = np.argmax( abs(subs[sub,:])>1e-5)
+            variables.remove(j)
             for i in range(n):
-                f_x[i]=f_x[i].subs(Var[-1],sum(self._x0)-sum(np.array([Var[i] for i in range(n-1)])))
-        else:
-            dim=n
-        dF = [[sym.diff(f_x[i],Var[j]) for j in range(dim)] for i in range(dim)]
-        subs_dictionary = {Var[i]:Xstar[i] for i in range(dim)}
+                f_x[i]=f_x[i].subs(Var[j],sum([self._x0[k]*subs[sub,k] for k in range(j,n)])
+                                   -sum(np.array([Var[k]*subs[sub,k] for k in range(j+1,n)])))
+        Var = [Var[i] for i in variables]
+        
+        dF = [[sym.diff(f_x[variables[i]],Var[j]) for j in range(dim)] for i in range(dim)]
+        subs_dictionary = {Var[i]:Xstar[variables[i]] for i in range(dim)}
         A=np.array([[float(dF[i][j].evalf(subs=subs_dictionary))
                   for j in range(dim)]
                  for i in range(dim)])
@@ -171,11 +199,11 @@ class DDPP():
         Q=np.array([[0. for i in range(dim)] for j in range(dim)])
 
         for l in range(number_transitions):
-            Q += np.array([[self._list_of_transitions[l][p]*self._list_of_transitions[l][m]*
+            Q += np.array([[self._list_of_transitions[l][variables[p]]*self._list_of_transitions[l][variables[m]]*
                          self._list_of_rate_functions[l](Xstar)
                          for m in range(dim)]
                     for p in range(dim)])
-
+        
         W = scipy.linalg.solve_continuous_lyapunov(A,Q)
         A_inv=numpy.linalg.inv(A)
         BtimesW = [sum(np.array([[B[j][k_1][k_2]*W[k_1][k_2] 
@@ -185,9 +213,16 @@ class DDPP():
         C=[ 0.5*sum([A_inv[i][j]* BtimesW[j] for j in range(dim)]) 
             for i in range(dim)]
         C = np.sum(C,1)
-        if dim == n-1:
-            C = list(C)
-            C.append(-sum(C))
+
+        # We now attemps to reconstruct the full C if the number of dimensions was reduced. 
+        if dim < n :
+            newC = np.zeros(n)
+            for i in range(dim):
+                newC[variables[i]] = C[i]
+            for sub in reversed(range(len(subs))):
+                j = np.argmax( abs(subs[sub,:])>1e-5)
+                newC[j] = -sum(np.array([newC[k]*subs[sub,k] for k in range(j+1,n)]))
+            C = newC
         return(np.array(C))
 
 
