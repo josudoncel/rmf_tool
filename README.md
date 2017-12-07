@@ -28,7 +28,7 @@ below (from basic to more advanced).
 
 ### Computation time
 
-The computation of the function 'theoretical_V' grows as d^3, where d is the dimension of the model. When using the option "symbolic_differentiation=True" (default), it takes about 10 second for a 50-dimensional system, about 60 seconds for a 100-dimensional system. Note that for large models, most of the time is taken by the computation of the symbolic derivatives. This time can be reduced when using "symbolic_differentiation=False" to approximatively 5 sec for 50-dimensional systems and about 20 seconds for 100-dimensional systems. 
+The computation of the function 'theoretical_V' grows as d^3, where d is the dimension of the model. When using the option "symbolic_differentiation=True" (default), it takes about 10 second for a 50-dimensional system, about 60 seconds for a 100-dimensional system. Note that for large models, most of the time is taken by the computation of the symbolic derivatives. This time can be reduced when using "symbolic_differentiation=False" to approximatively 4 sec for 50-dimensional systems and about 15 seconds for 100-dimensional systems. 
 
 The simulation of the underlying Markov chain is not optimized and therefore might be slow for large models. 
 
@@ -61,5 +61,12 @@ This library depends on the following python library:
 * scipy
 * sympy 
 * matplotlib.pyplot
+
+## History
+
+* v0.2 :
+  - (New feature) Support for multi-class variables
+  - (Optimization) Addition of an option to use a numerical differentiation
+* v0.1 : original version 
 
 **Copyright** 2017. **Authors** : Nicolas Gast, Emmanuel Rodriguez.
