@@ -245,14 +245,10 @@ class DDPP():
             A = self._numericalJacobian(drift_array,fixedPointProj)
             B = self._numericalHessian(drift_array,fixedPointProj)
             
-        Q=np.array([[0. for i in range(dim)] for j in range(dim)])
-
+        Q=np.zeros((dim,dim))
         for l in range(number_transitions):
-            Q += np.array([[self._list_of_transitions[l][variables[p]]*self._list_of_transitions[l][variables[m]]*
-                         self._list_of_rate_functions[l](fixedPoint)
-                         for m in range(dim)]
-                    for p in range(dim)])
-        
+            v = [self._list_of_transitions[l][variables[p]] for p in range(dim)]
+            Q += np.kron(v,v).reshape(dim,dim)*self._list_of_rate_functions[l](fixedPoint)
         W = scipy.linalg.solve_continuous_lyapunov(A,Q)
         A_inv=numpy.linalg.inv(A)
         BtimesW = [sum(np.array([[B[j][k_1][k_2]*W[k_1][k_2] 
