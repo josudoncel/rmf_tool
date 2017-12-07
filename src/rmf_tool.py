@@ -165,8 +165,6 @@ class DDPP():
     def _numericalJacobian(self,drift,xstar,epsilon=1e-6):
         """ Computes the Jacobian of the drift using a finite difference method : 
         
-        Only works with DIM=N for now. 
- 
         Returns : dF[i][j] = \partial f_i / \partial x_j evaluates in xstar
         """
         dim = len(xstar)
@@ -181,8 +179,6 @@ class DDPP():
     def _numericalHessian(self,drift,xstar,epsilon=1e-4):
         """ Computes the Jacobian of the drift using a finite difference method : 
         
-        Only works with DIM=N for now. 
- 
         Returns : ddF[i][j][k] = \partial^2 f_i / (\partial x_j\partial x_k) evaluates in xstar
         """
         dim = len(xstar)
@@ -204,7 +200,12 @@ class DDPP():
         return(np.array(B))
 
     def theoretical_C(self, symbolic_differentiation=True):
-        """ To be written 
+        """This code computes the constant "V" of Theorem~1 of https://hal.inria.fr/hal-01622054/document 
+        
+        Note : for now this function does not support rates that depend on N (i.e. C=0)
+
+        Args: 
+            symbolic_differentiation (bool, default=True) : when True, the derivative are computed using Sympy. When false, they are computed using a finite difference method. 
         """
         n = self._model_dimension
         number_transitions = len(self._list_of_transitions)

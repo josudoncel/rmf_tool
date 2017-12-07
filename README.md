@@ -1,4 +1,3 @@
-
 # Density dependent population processes and refined mean-field approximation
 
 
@@ -6,9 +5,7 @@ This python librarie implements an algorithm to simulate and study a
 density dependent population process, to compute its mean-field
 approximation and its refined mean-field approximation.
 
-### Remarks
-
-
+In particular, it provides a numerical algorithm to compute the constant of the "refined mean field approximation" provided in the paperA Refined Mean Field Approximation [](https://hal.inria.fr/hal-01622054/document) by N. Gast and B. Van Houdt, accepted at SIGMETRICS 2018. 
 
 
 ## Documentation
@@ -31,7 +28,7 @@ below (from basic to more advanced).
 
 ### Computation time
 
-The computation of the function 'theoretical_C' grows as d^3, where d is the dimension of the model. It takes about 5 second for a 50-dimensional system, about 40 seconds for a 100-dimensional system. Note that for large models, most of the time is taken by the computation of the symbolic derivatives. 
+The computation of the function 'theoretical_C' grows as d^3, where d is the dimension of the model. When using the option "symbolic_differentiation=True" (default), it takes about 10 second for a 50-dimensional system, about 60 seconds for a 100-dimensional system. Note that for large models, most of the time is taken by the computation of the symbolic derivatives. This time can be reduced when using "symbolic_differentiation=False" to approximatively 5 sec for 50-dimensional systems and about 20 seconds for 100-dimensional systems. 
 
 The simulation of the underlying Markov chain is not optimized and therefore might be slow for large models. 
 
