@@ -18,7 +18,7 @@ The class DDPP can be used to defined a process, via the functions *add_transiti
 
 * A sample trajectory (via simulation : function *simulate(N,time)*
 * The mean-field (or fluid) approximation : function *ode(time)*
-* The refined mean-field approximation (for the steady-state) : function *theoretical_C()*
+* The refined mean-field approximation (for the steady-state) : function *theoretical_V()*
 
 Most of the functions are documented and their documentation is
 accessible by the "help" command.
@@ -28,14 +28,14 @@ below (from basic to more advanced).
 
 ### Computation time
 
-The computation of the function 'theoretical_C' grows as d^3, where d is the dimension of the model. When using the option "symbolic_differentiation=True" (default), it takes about 10 second for a 50-dimensional system, about 60 seconds for a 100-dimensional system. Note that for large models, most of the time is taken by the computation of the symbolic derivatives. This time can be reduced when using "symbolic_differentiation=False" to approximatively 5 sec for 50-dimensional systems and about 20 seconds for 100-dimensional systems. 
+The computation of the function 'theoretical_V' grows as d^3, where d is the dimension of the model. When using the option "symbolic_differentiation=True" (default), it takes about 10 second for a 50-dimensional system, about 60 seconds for a 100-dimensional system. Note that for large models, most of the time is taken by the computation of the symbolic derivatives. This time can be reduced when using "symbolic_differentiation=False" to approximatively 5 sec for 50-dimensional systems and about 20 seconds for 100-dimensional systems. 
 
 The simulation of the underlying Markov chain is not optimized and therefore might be slow for large models. 
 
 ### Examples
 
 ### Small example :
-The following code define a 2-dimensional model and plot the mean-field approximation versus one sample trajectory.
+The following code defines a 2-dimensional model. It plots the mean-field approximation versus one sample trajectory. It then computes the refined mean-field approximation (in steady-state)
 
 ```
 import src.rmf_tool as rmf
@@ -44,6 +44,7 @@ ddpp.add_transition([-1,1], lambda x : x[0])
 ddpp.add_transition([1,-1], lambda x : x[1]+x[0]*x[1])
 ddpp.set_initial_state([.5,.5])
 ddpp.plot_ODE_vs_simulation(N=100)
+ddpp.theoretical_V()
 ```
 
 #### More advanced examples

@@ -162,26 +162,26 @@ class DDPP():
             subs = np.array([])
         return(dim,subs)
 
-    def _numericalJacobian(self,drift,xstar,epsilon=1e-6):
+    def _numericalJacobian(self,drift,fixedPoint,epsilon=1e-6):
         """ Computes the Jacobian of the drift using a finite difference method : 
         
-        Returns : dF[i][j] = \partial f_i / \partial x_j evaluates in xstar
+        Returns : dF[i][j] = \partial f_i / \partial x_j evaluates in fixedPoint
         """
-        dim = len(xstar)
+        dim = len(fixedPoint)
         def e(i):
             res = np.zeros(dim)
             res[i] = 1
             return(res)
-        A = [(drift(xstar+epsilon*e(j))-drift(xstar-epsilon*e(j)))/(2*epsilon) for j in range(dim)]
+        A = [(drift(fixedPoint+epsilon*e(j))-drift(fixedPoint-epsilon*e(j)))/(2*epsilon) for j in range(dim)]
         return(np.array(A).transpose())
 
     
-    def _numericalHessian(self,drift,xstar,epsilon=1e-4):
+    def _numericalHessian(self,drift,fixedPoint,epsilon=1e-4):
         """ Computes the Jacobian of the drift using a finite difference method : 
         
-        Returns : ddF[i][j][k] = \partial^2 f_i / (\partial x_j\partial x_k) evaluates in xstar
+        Returns : ddF[i][j][k] = \partial^2 f_i / (\partial x_j\partial x_k) evaluates in fixedPoint
         """
-        dim = len(xstar)
+        dim = len(fixedPoint)
         def e(i):
             res = np.zeros(dim)
             res[i] = 1
@@ -191,15 +191,15 @@ class DDPP():
             res[i] = 1
             res[j] += 1
             return(res)
-        fXstar = drift(xstar)
-        ddB = [[drift(xstar+epsilon*ee(i,j)) for j in range(i+1)] for i in range(dim)]
-        dB = [drift(xstar+epsilon*e(i)) for i in range(dim)]
-        B = [[(ddB[max(i,j)][min(i,j)] - dB[i] - dB[j] + fXstar)/epsilon**2
+        ffixedPoint = drift(fixedPoint)
+        ddB = [[drift(fixedPoint+epsilon*ee(i,j)) for j in range(i+1)] for i in range(dim)]
+        dB = [drift(fixedPoint+epsilon*e(i)) for i in range(dim)]
+        B = [[(ddB[max(i,j)][min(i,j)] - dB[i] - dB[j] + ffixedPoint)/epsilon**2
               for i in range(dim)] for j in range(dim)]
         B = [[[B[j][k][l] for j in range(dim)] for k in range(dim)] for l in range(dim)]
         return(np.array(B))
 
-    def theoretical_C(self, symbolic_differentiation=True):
+    def theoretical_V(self, symbolic_differentiation=True):
         """This code computes the constant "V" of Theorem~1 of https://hal.inria.fr/hal-01622054/document 
         
         Note : for now this function does not support rates that depend on N (i.e. C=0)
@@ -209,7 +209,7 @@ class DDPP():
         """
         n = self._model_dimension
         number_transitions = len(self._list_of_transitions)
-        Xstar = self.fixed_point()
+        fixedPoint = self.fixed_point()
     
         Var=np.array([sym.symbols('x_{}'.format(i)) for i in range(n)])
         f_x=np.zeros(n)
@@ -230,7 +230,7 @@ class DDPP():
 
         if (symbolic_differentiation):
             dF = [[sym.diff(f_x[variables[i]],Var[j]) for j in range(dim)] for i in range(dim)]
-            subs_dictionary = {Var[i]:Xstar[variables[i]] for i in range(dim)}
+            subs_dictionary = {Var[i]:fixedPoint[variables[i]] for i in range(dim)}
             A=np.array([[float(dF[i][j].evalf(subs=subs_dictionary))
                          for j in range(dim)]
                         for i in range(dim)])
@@ -241,15 +241,15 @@ class DDPP():
         else:
             drift = lambdify([Var], [f_x[variables[i]] for i in range(dim)])
             drift_array = lambda x : np.array(drift(x))
-            xstar_proj = np.array([Xstar[variables[i]] for i in range(dim)])
-            A = self._numericalJacobian(drift_array,xstar_proj)
-            B = self._numericalHessian(drift_array,xstar_proj)
+            fixedPointProj = np.array([fixedPoint[variables[i]] for i in range(dim)])
+            A = self._numericalJacobian(drift_array,fixedPointProj)
+            B = self._numericalHessian(drift_array,fixedPointProj)
             
         Q=np.array([[0. for i in range(dim)] for j in range(dim)])
 
         for l in range(number_transitions):
             Q += np.array([[self._list_of_transitions[l][variables[p]]*self._list_of_transitions[l][variables[m]]*
-                         self._list_of_rate_functions[l](Xstar)
+                         self._list_of_rate_functions[l](fixedPoint)
                          for m in range(dim)]
                     for p in range(dim)])
         
@@ -259,20 +259,20 @@ class DDPP():
                            for k_2 in range(dim)] 
                           for k_1 in range(dim)])) for j in range(dim)]
                 
-        C=[ 0.5*sum([A_inv[i][j]* BtimesW[j] for j in range(dim)]) 
+        V=[ 0.5*sum([A_inv[i][j]* BtimesW[j] for j in range(dim)]) 
             for i in range(dim)]
-        C = np.sum(C,1)
+        V = np.sum(V,1)
 
         # We now attemps to reconstruct the full C if the number of dimensions was reduced. 
         if dim < n :
-            newC = np.zeros(n)
+            newV = np.zeros(n)
             for i in range(dim):
-                newC[variables[i]] = C[i]
+                newV[variables[i]] = V[i]
             for sub in reversed(range(len(subs))):
                 j = np.argmax( abs(subs[sub,:])>1e-5)
-                newC[j] = -sum(np.array([newC[k]*subs[sub,k] for k in range(j+1,n)]))
-            C = newC
-        return(np.array(C))
+                newV[j] = -sum(np.array([newV[k]*subs[sub,k] for k in range(j+1,n)]))
+            V = newV
+        return(np.array(V))
 
 
     def _batch_meanConfidenceInterval(self,T,X):
@@ -310,14 +310,13 @@ class DDPP():
 
         Return : (Xm,Xrmf,Xs,Vs) where: 
              Xm is the fixed point of the mean-field approximation 
-             Xrmf = Xm + C/N
+             Xrmf = Xm + V/N
              Xs is an approximation E[X] (computed by simulation)
              Vs is an estimation of the variance
-        
         """
         Xm = self.fixed_point()
-        C = self.theoretical_C()
-        Xrmf = Xm+C/N
+        V = self.theoretical_V()
+        Xrmf = Xm+V/N
         Xs,Vs = self.steady_state_simulation(N,time)
         return(Xm,Xrmf,Xs,Vs)
     
