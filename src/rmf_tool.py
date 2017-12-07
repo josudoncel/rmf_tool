@@ -5,7 +5,7 @@ import sympy as sym
 import scipy.linalg 
 import numpy.linalg
 import matplotlib.pyplot as plt
-
+from sympy.utilities.lambdify import lambdify
 
 class RmfError(Exception):
     """Basic error class for this module
@@ -162,7 +162,48 @@ class DDPP():
             subs = np.array([])
         return(dim,subs)
 
-    def theoretical_C(self):
+    def _numericalJacobian(self,drift,xstar,epsilon=1e-6):
+        """ Computes the Jacobian of the drift using a finite difference method : 
+        
+        Only works with DIM=N for now. 
+ 
+        Returns : dF[i][j] = \partial f_i / \partial x_j evaluates in xstar
+        """
+        dim = len(xstar)
+        def e(i):
+            res = np.zeros(dim)
+            res[i] = 1
+            return(res)
+        A = [(drift(xstar+epsilon*e(j))-drift(xstar-epsilon*e(j)))/(2*epsilon) for j in range(dim)]
+        return(np.array(A).transpose())
+
+    
+    def _numericalHessian(self,drift,xstar,epsilon=1e-4):
+        """ Computes the Jacobian of the drift using a finite difference method : 
+        
+        Only works with DIM=N for now. 
+ 
+        Returns : ddF[i][j][k] = \partial^2 f_i / (\partial x_j\partial x_k) evaluates in xstar
+        """
+        dim = len(xstar)
+        def e(i):
+            res = np.zeros(dim)
+            res[i] = 1
+            return(res)
+        def ee(i,j):
+            res = np.zeros(dim)
+            res[i] = 1
+            res[j] += 1
+            return(res)
+        fXstar = drift(xstar)
+        ddB = [[drift(xstar+epsilon*ee(i,j)) for j in range(i+1)] for i in range(dim)]
+        dB = [drift(xstar+epsilon*e(i)) for i in range(dim)]
+        B = [[(ddB[max(i,j)][min(i,j)] - dB[i] - dB[j] + fXstar)/epsilon**2
+              for i in range(dim)] for j in range(dim)]
+        B = [[[B[j][k][l] for j in range(dim)] for k in range(dim)] for l in range(dim)]
+        return(np.array(B))
+
+    def theoretical_C(self, symbolic_differentiation=True):
         """ To be written 
         """
         n = self._model_dimension
@@ -173,8 +214,7 @@ class DDPP():
         f_x=np.zeros(n)
         for i in range(number_transitions):
             f_x = f_x + self._list_of_transitions[i]*self._list_of_rate_functions[i](Var)
-
-
+        
         # The following code attempts to reduce the number of dimensions by testing
         # if the transitions conserve some linear combinations of the coordinates
         (dim,subs) = self.test_for_linear_dependencies()
@@ -186,16 +226,24 @@ class DDPP():
                 f_x[i]=f_x[i].subs(Var[j],sum([self._x0[k]*subs[sub,k] for k in range(j,n)])
                                    -sum(np.array([Var[k]*subs[sub,k] for k in range(j+1,n)])))
         Var = [Var[i] for i in variables]
-        
-        dF = [[sym.diff(f_x[variables[i]],Var[j]) for j in range(dim)] for i in range(dim)]
-        subs_dictionary = {Var[i]:Xstar[variables[i]] for i in range(dim)}
-        A=np.array([[float(dF[i][j].evalf(subs=subs_dictionary))
-                  for j in range(dim)]
-                 for i in range(dim)])
-        B=np.array([[[float(sym.diff(dF[j][k],Var[l]).evalf(subs=subs_dictionary) ) 
-                      for l in range(dim)]
-                     for k in range(dim)]
-                    for j in range(dim)])
+
+        if (symbolic_differentiation):
+            dF = [[sym.diff(f_x[variables[i]],Var[j]) for j in range(dim)] for i in range(dim)]
+            subs_dictionary = {Var[i]:Xstar[variables[i]] for i in range(dim)}
+            A=np.array([[float(dF[i][j].evalf(subs=subs_dictionary))
+                         for j in range(dim)]
+                        for i in range(dim)])
+            B=np.array([[[float(sym.diff(dF[j][k],Var[l]).evalf(subs=subs_dictionary) ) 
+                          for l in range(dim)]
+                         for k in range(dim)]
+                        for j in range(dim)])
+        else:
+            drift = lambdify([Var], [f_x[variables[i]] for i in range(dim)])
+            drift_array = lambda x : np.array(drift(x))
+            xstar_proj = np.array([Xstar[variables[i]] for i in range(dim)])
+            A = self._numericalJacobian(drift_array,xstar_proj)
+            B = self._numericalHessian(drift_array,xstar_proj)
+            
         Q=np.array([[0. for i in range(dim)] for j in range(dim)])
 
         for l in range(number_transitions):
