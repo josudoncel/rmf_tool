@@ -32,7 +32,7 @@ launch_for_rho_d (){
 
 for i in `seq 1 100`; do
     for d in 4 3 2; do
-	for rho in 70; do # 90 95; do
+	for rho in 70 90 95; do
 	    launch_for_rho_d $rho $d
 	done
     done
