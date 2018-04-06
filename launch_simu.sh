@@ -2,7 +2,7 @@ g++ -W -Wall -O3 JSQd_simulate.cc -o simulate_JSQ
 
 number_of_simulation() {
     N=$1
-    C=`expr 500 + $N \* $N / 100`
+    C=`expr 1000 + $N \* $N / 100`
     echo $C
 }
 
@@ -18,9 +18,9 @@ launch_for_rho_d (){
 	    simulations_todo=`number_of_simulation $N`
 	    if [ $simulations_performed -le $simulations_todo ] ;
 	    then
-		# We launch 400 additional simulations 
+		# We launch 500 additional simulations 
 		echo "Simulations for N=$N d=$d rho=0.${rho} not done    ($simulations_performed < $simulations_todo)"
-		{ time  ./simulate_JSQ r0.${rho} d${d} N${N} e50 >> ${fileName};} 2>&1 | grep real
+		{ time  ./simulate_JSQ r0.${rho} d${d} N${N} e500 >> ${fileName};} 2>&1 | grep real
 	    else
 		finished[$N]=1
 		echo "N=$N d=$d rho=0.$rho done     ($simulations_performed < $simulations_todo)";
@@ -31,9 +31,9 @@ launch_for_rho_d (){
 
 
 for i in `seq 1 100`; do
-    for d in 4 3 2; do
-	for rho in 70 90 95; do
+    for rho in 90 95 70; do
+	for d in 4 3 2; do
 	    launch_for_rho_d $rho $d
 	done
     done
-done 
+done

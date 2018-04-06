@@ -46,9 +46,6 @@ class JSQd {
       }
   }
   void simulate(int T){
-    simulate_twoChoice(T);
-  }
-  void simulate_twoChoice(int T){
     if (withoutReplacement)
       simulate_twoChoice_withoutReplacement(T);
     else
@@ -57,40 +54,17 @@ class JSQd {
   void simulate_twoChoice_withReplacement(int T) {
     for(int t=0;t<T;t++){
       double u = rand_u();
-      //std::cerr << u << "\n";
       if (u < 1/(1+rho) ) { // departure
-	//std::cout << "departure\n";
 	double u = rand_u();
 	int i=0;
-	//while( i<K && X[i]-X[i+1] < u) {u += X[i+1]-X[i]; i++;}
 	while( i<K && u < X[i+1] ) {i++; }
 	if (i>0) {X[i]-=oneOverN; total_number_jobs--;}
       }
       else{                 // arrival
-	//std::cout << "arrival @ ";
 	double u = rand_u();
 	
 	int i=0;
-	while( i<K && u < pow(X[i+1],d)) { i++;}
-	if (i<K) {X[i+1]+=oneOverN; total_number_jobs++;}
-      }
-    }
-  }
-  void simulate_oneChoice(int T) {
-    for(int t=0;t<T;t++){
-      double u = rand_u();
-      if (u < 1/(1+rho) ) { // departure
-	double u = rand_u();
-	int i=0;
-	while( i<K && u < X[i+1] ) {i++; }
-	if (i>0) {X[i]-=oneOverN; total_number_jobs--;}
-      }
-      else{                 // arrival
-	double u = rand_u();
-	double v = rand_u(); (void) v;
-	int i=0;
-	//while( i<K && X[i]-X[i+1] < u) {u += X[i+1]-X[i]; i++;}
-	while( i<K && u < X[i+1] ) { i++; }
+	while( i<K && u < pow(X[i+1],d) ) { i++;}
 	if (i<K) {X[i+1]+=oneOverN; total_number_jobs++;}
       }
     }
@@ -99,7 +73,6 @@ class JSQd {
     for(int t=0;t<T;t++){
       double u = rand_u();
       if (u < 1/(1+rho) ) { // departure
-	//std::cout << "departure\n";
 	double u = rand_u();
 	int i=0;
 	while( i<K && X[i]-X[i+1] < u) {u += X[i+1]-X[i]; i++;}
@@ -112,12 +85,11 @@ class JSQd {
 	while( i<K && (X[i]-X[i+1])*(X[i+1]+X[i]+oneOverN)/(1-oneOverN) < u) {
 	  u += -(X[i]-X[i+1])*(X[i+1]+X[i]+oneOverN)/(1-oneOverN); i++;}
 	if (i<K) {X[i+1]+=oneOverN; total_number_jobs++;}
-	//std::cout << i<< " (" << u<<")\n";
       }
     }
   }
   void steady_state(){
-    int startup_time = 10000*N; // sufficient for rho = .95 at least 
+    int startup_time = 10000*N; // 10000 was not sufficient for rho = .95 and d=4?
     simulate(startup_time);
     double *average;
     if ( only_print_total_number_of_jobs )
@@ -155,7 +127,7 @@ class JSQd {
     delete average;
   }
   void test_convergence(){
-    simulate(1000*N); // seems to suffices for rho = 0.99
+    simulate(100000*N); // 10000*N seems to suffice for d=2 and rho=0.99
     for(int t=0;t<10000;t++){
       simulate(1000);
       print();
@@ -179,7 +151,12 @@ int main(int argc, char ** argv) {
   int nb_experiments = -1;
   bool only_print_one_trajectory = false;
   bool withoutReplacement = false;
-  bool only_print_total_number_of_jobs = false; 
+  bool only_print_total_number_of_jobs = false;
+
+  time_t t;
+  time(&t);
+  mt_rand.seed(t+N);
+  
   for(int i=1;i<argc;i++){
     switch(* (argv[i]) ){
     case 'N': N=atoi(argv[i]+1); break;
@@ -191,11 +168,9 @@ int main(int argc, char ** argv) {
     case 't': only_print_one_trajectory=true; break;
     case 'T': only_print_total_number_of_jobs=true; break;
     case 'W': withoutReplacement = true; break;
+    default: std::cerr << "unkown option : "<<argv[i]<<"\n";exit(1);
     }
   }
-  time_t t;
-  time(&t);
-  mt_rand.seed(t+N);
   //mt_rand.seed(2);
 
   if (only_print_one_trajectory){
