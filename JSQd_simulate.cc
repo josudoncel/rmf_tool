@@ -1,6 +1,7 @@
 #include<iostream>
 #include<cmath>
 #include<random>
+#include<sys/time.h>
 
 std::mt19937 mt_rand(0);
 std::uniform_real_distribution<double> d(0.0,1.0);
@@ -133,10 +134,13 @@ class JSQd {
       print();
     }
   }
-  void print_one_trajectory(){
-    X[1]=1; X[2] = 1;
-    total_number_jobs = 2*N;
-    for(int t=0;t<10000*N;t++){
+  void print_one_trajectory(double initial_number_of_jobs){
+    int i=1;
+    while(i<initial_number_of_jobs) {X[i]=1;i++;}
+    X[i] = 1+initial_number_of_jobs-i;
+    total_number_jobs = initial_number_of_jobs*N;
+    print();
+    for(int t=0;t<100*N;t++){
       simulate(1);
       print();
     }
@@ -152,10 +156,12 @@ int main(int argc, char ** argv) {
   bool only_print_one_trajectory = false;
   bool withoutReplacement = false;
   bool only_print_total_number_of_jobs = false;
-
-  time_t t;
-  time(&t);
-  mt_rand.seed(t+N);
+  double initial_number_of_jobs = 2.7; // if we simulate only one trajectory
+  
+  struct timeval tv;
+  struct timezone tz;
+  gettimeofday(&tv, &tz);
+  mt_rand.seed(tv.tv_usec+N);
   
   for(int i=1;i<argc;i++){
     switch(* (argv[i]) ){
@@ -165,7 +171,8 @@ int main(int argc, char ** argv) {
     case 'e': nb_experiments=atoi(argv[i]+1); break;
     case 'c': {JSQd simu(N,rho,40,d,withoutReplacement,only_print_one_trajectory);
 	simu.test_convergence(); exit(1);} break;
-    case 't': only_print_one_trajectory=true; break;
+    case 't': only_print_one_trajectory=true;
+      initial_number_of_jobs=atof(argv[i]+1); break;
     case 'T': only_print_total_number_of_jobs=true; break;
     case 'W': withoutReplacement = true; break;
     default: std::cerr << "unkown option : "<<argv[i]<<"\n";exit(1);
@@ -174,8 +181,8 @@ int main(int argc, char ** argv) {
   //mt_rand.seed(2);
 
   if (only_print_one_trajectory){
-    JSQd simu(N,rho,30,d, withoutReplacement,only_print_total_number_of_jobs);
-    simu.print_one_trajectory();
+    JSQd simu(N,rho,20,d, withoutReplacement,only_print_total_number_of_jobs);
+    simu.print_one_trajectory(initial_number_of_jobs);
   }
   else
     {
