@@ -89,7 +89,7 @@ class JSQd {
     }
   }
   void steady_state(){
-    int startup_time = 10000*N; // 10000 was not sufficient for rho = .95 and d=4?
+    int startup_time = 100000*N; // 10000 was not sufficient for rho = .95 and d=4?
     simulate(startup_time);
     double *average;
     if ( only_print_total_number_of_jobs )
