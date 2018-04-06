@@ -102,7 +102,7 @@ class JSQd {
       for(int i=0;i<20;i++)
 	average[i] = 0;
     }
-    int nb_samples = 20000;
+    int nb_samples = 200000;
     if ( only_print_total_number_of_jobs )
       {
 	for(int t=0;t<10*nb_samples;t++){

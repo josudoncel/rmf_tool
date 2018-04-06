@@ -20,7 +20,7 @@ launch_for_rho_d (){
 	    then
 		# We launch 500 additional simulations 
 		echo "Simulations for N=$N d=$d rho=0.${rho} not done    ($simulations_performed < $simulations_todo)"
-		{ time  ./simulate_JSQ r0.${rho} d${d} N${N} e500 >> ${fileName};} 2>&1 | grep real
+		{ time  ./simulate_JSQ r0.${rho} d${d} N${N} e5 >> ${fileName};} 2>&1 | grep real
 	    else
 		finished[$N]=1
 		echo "N=$N d=$d rho=0.$rho done     ($simulations_performed < $simulations_todo)";
