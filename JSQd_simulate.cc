@@ -140,7 +140,7 @@ class JSQd {
     X[i] = 1+initial_number_of_jobs-i;
     total_number_jobs = initial_number_of_jobs*N;
     print();
-    for(int t=0;t<100*N;t++){
+    for(int t=0;t<300*N;t++){
       simulate(1);
       print();
     }
