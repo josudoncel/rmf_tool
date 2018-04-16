@@ -13,7 +13,7 @@ def averageTraj(N,rho,initial_number_of_jobs,nb_samples):
         loadedFile=np.load(fileName)
         x = loadedFile['x']
         nb_samples_already_computed=loadedFile['nb_samples']
-        if nb_samples_already_computed > nb_samples:
+        if nb_samples_already_computed >= nb_samples:
             print('already ',nb_samples_already_computed,'/',
                   nb_samples,' for N=',N,'and rho=',rho)
             return
@@ -38,7 +38,7 @@ def averageTraj(N,rho,initial_number_of_jobs,nb_samples):
 
 
 for nb_samples in [100,1000,5000,10000,20000,30000,40000,50000,100000]:
-    myN = [10,5,20] if nb_samples<10000 else [10]
+    myN = [10,5,20] if nb_samples<=10000 else [10]
     for N in myN:
         averageTraj(N,0.9,2.8,nb_samples)
         #averageTraj(N,0.7,1.3)      # We cannot see the difference
