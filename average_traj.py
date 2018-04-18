@@ -37,8 +37,8 @@ def averageTraj(N,rho,initial_number_of_jobs,nb_samples):
     np.savez(fileName,x=x,nb_samples=max(nb_samples,nb_samples_already_computed))
 
 
-for nb_samples in [100,1000,5000,10000,20000,30000,40000,50000,100000]:
-    myN = [10,5,20] if nb_samples<=10000 else [10]
+for nb_samples in [100,1000,5000,10000,15000,20000,30000,40000,50000,70000,100000]:
+    myN = [10,20] if nb_samples<=20000 else [10]
     for N in myN:
         averageTraj(N,0.9,2.8,nb_samples)
         #averageTraj(N,0.7,1.3)      # We cannot see the difference
