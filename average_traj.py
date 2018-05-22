@@ -5,8 +5,8 @@ from time import time
 
 os.system('make simulate_JSQ')
 
-def averageTraj(N,rho,initial_number_of_jobs,nb_samples):
-    fileName = 'traj/averageTraj_N{}_r{}_init{}.npz'.format(
+def simulateAverageTraj(N,rho,initial_number_of_jobs,nb_samples):
+    fileName = 'jsqD_simulate/traj/averageTraj_N{}_r{}_init{}.npz'.format(
         N,int(rho*100),int(initial_number_of_jobs*10))
     t = time()
     if os.path.exists(fileName):
@@ -22,9 +22,9 @@ def averageTraj(N,rho,initial_number_of_jobs,nb_samples):
         nb_samples_already_computed=0
         x=np.zeros((N*300,20))
     for i in range(nb_samples_already_computed,nb_samples):
-        os.system('./simulate_JSQ N{} r{} t{} > traj/tmpFile'.format(
+        os.system('jsqD_simulate/simulate_JSQ N{} r{} t{} > jsqD_simulate/traj/tmpFile'.format(
             N,rho,initial_number_of_jobs))
-        y=np.array(pd.read_csv('traj/tmpFile',sep=' ',dtype=np.float64))[:,:-1]
+        y=np.array(pd.read_csv('jsqD_simulate/traj/tmpFile',sep=' ',dtype=np.float64))[:,:-1]
         x+=y
         if ((i+1) % 100==0):
             print('\rCompleted:{}/{}, rho={},N={}, estimated remaining time={:.0f}sec'.format(
@@ -33,18 +33,14 @@ def averageTraj(N,rho,initial_number_of_jobs,nb_samples):
                   ,end='')
     print('\rCompleted:{}/{}, rho={},N={}, total time={:.0f}sec{}'.format(
                 nb_samples,nb_samples,rho,N, (time()-t),'                    '))
-    # fileName='traj/averageTraj_N{}_r{}_init{}.txt'.format(N,int(rho*100),int(initial_number_of_jobs*10))
     np.savez(fileName,x=x,nb_samples=max(nb_samples,nb_samples_already_computed))
 
 
-for nb_samples in [100,1000,5000,10000,15000,20000,30000,40000,50000,70000,100000]:
-    myN = [10,20] if nb_samples<=20000 else [10]
-    for N in myN:
-        averageTraj(N,0.9,2.8,nb_samples)
-        #averageTraj(N,0.7,1.3)      # We cannot see the difference
-        averageTraj(N,0.95,3.6,nb_samples)
-
-#x=np.loadtxt('traj/{}'.format(0))
-# for i in range(1,100):
-#     x+=np.loadtxt('traj/{}'.format(i))
-# x /= 100
+def loadTransientSimu(N,rho,initial_number_of_jobs):
+    fileName='jsqD_simulate/traj/averageTraj_N{}_r{}_init{}.npz'.format(
+        N,int(rho*100),int(10*initial_number_of_jobs))
+    myData = np.load(fileName)
+    Y = myData['x']/myData['nb_samples']
+    Tsimu = np.arange(0,300*N)/(N*(1+rho))
+    print('average over ',myData['nb_samples'],'simulations')
+    return(Tsimu,Y)
