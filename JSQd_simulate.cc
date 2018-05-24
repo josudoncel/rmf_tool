@@ -31,8 +31,8 @@ class JSQd {
     X = new double[K+1];
     for(int i=0;i<K+1;i++) X[i] = 0;
     X[0] = 1;
-    if (withoutReplacement){
-      std::cerr << "without replacement not implemented for now\n";
+    if (withoutReplacement && d>2){
+      std::cerr << "WARNING : without replacement not implemented for d>2 choices\n";
     }
     total_number_jobs = N;
   }
