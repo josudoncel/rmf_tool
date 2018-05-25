@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 from time import time
 
+os.system('cd {} && make simulate_JSQ'.format(dir_path))
 path = os.path.abspath(__file__)
 dir_path = os.path.dirname(path)
-os.system('cd {} && make simulate_JSQ'.format(dir_path))
 
 def simulateAverageTraj(N,rho,initial_number_of_jobs,nb_samples):
     fileName = '{}/traj/averageTraj_N{}_r{}_init{}.npz'.format(
@@ -53,5 +53,3 @@ def loadTransientSimu(N,rho,initial_number_of_jobs,nb_samples=100):
     Tsimu = np.arange(0,300*N)/(N*(1+rho))
     print('average over ',myData['nb_samples'],'simulations')
     return(Tsimu,Y)
-
-    
