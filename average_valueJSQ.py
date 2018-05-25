@@ -3,9 +3,15 @@ import numpy as np
 import pandas as pd
 from time import time
 
+<<<<<<< HEAD
 path = os.path.abspath(__file__)
 dir_path = os.path.dirname(path)
 os.system('cd {} && make simulate_JSQ'.format(dir_path))
+=======
+os.system('cd {} && make simulate_JSQ'.format(dir_path))
+path = os.path.abspath(__file__)
+dir_path = os.path.dirname(path)
+>>>>>>> 8a2e749870eaf9fe591368d2436a550d15b50d43
 
 def simulateAverageTraj(N,rho,initial_number_of_jobs,nb_samples):
     fileName = '{}/traj/averageTraj_N{}_r{}_init{}.npz'.format(
@@ -53,6 +59,7 @@ def loadTransientSimu(N,rho,initial_number_of_jobs,nb_samples=100):
     Tsimu = np.arange(0,300*N)/(N*(1+rho))
     print('average over ',myData['nb_samples'],'simulations')
     return(Tsimu,Y)
+<<<<<<< HEAD
 
 
 def loadDistributionQueueLength(N,d,rho):
@@ -68,3 +75,5 @@ def loadAverageQueueLength(N,d,rho):
     var = np.sqrt(np.var(means)/len(means))
     #print('var=',var)
     return(np.mean(means))
+=======
+>>>>>>> 8a2e749870eaf9fe591368d2436a550d15b50d43
