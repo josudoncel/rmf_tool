@@ -7,6 +7,8 @@ import numpy.linalg
 import matplotlib.pyplot as plt
 from sympy.utilities.lambdify import lambdify
 
+import time as ti
+
 class RmfError(Exception):
     """Basic error class for this module
     """
@@ -129,7 +131,7 @@ class DDPP():
             print('No initial condition given. We assume that the initial condition is "x0=[1,0,...]"')
             self._x0 = np.zeros(self._model_dimension)
             self._x0[0] = 1
-        return(self.ode(time=10000,number_of_steps=10)[1][-1,:])
+        return(self.ode(time=10000)[1][-1,:])
 
     def doTransitionsConserveSum(self):
         """This function tests if the transitions conserve the sum of the coordinates.
@@ -199,6 +201,66 @@ class DDPP():
         B = [[[B[j][k][l] for j in range(dim)] for k in range(dim)] for l in range(dim)]
         return(np.array(B))
 
+
+    def refinedTransient(self,time,number_of_steps=1000):
+        """
+        
+        Returns : (T,X,XVW), where T is a time interval, X the solution of the ODE, XVW is a 2d+d^2 vector. 
+
+        """
+        n = self._model_dimension
+        number_transitions = len(self._list_of_transitions)
+
+        # First we compute 'lambdified version' of Fp, Fpp and Q. 
+        Var=np.array([sym.symbols('x_{}'.format(i)) for i in range(n)])
+        f_x=np.zeros(n)
+        for l in range(number_transitions):
+            f_x = f_x + self._list_of_transitions[l]*self._list_of_rate_functions[l](Var)
+        
+        dF = np.array([[sym.diff(f_x[i],Var[j]) for j in range(n)] for i in range(n)]).reshape((n**2))
+        ddF = np.array([[sym.diff(f_x[i],Var[j],Var[k]) for j in range(n) for k in range(n)] for i in range(n)]).reshape((n**3))
+        Q = [[0 for i in range(n)] for j in range(n)]
+        for l in range(number_transitions):
+            for i in range(n):
+                for j in range(n):
+                    Q[i][j] +=  (self._list_of_transitions[l][i]*self._list_of_transitions[l][j]
+                                 *self._list_of_rate_functions[l](Var))
+        Qvec = np.array(Q).reshape((n*n))
+        
+        F = lambdify([Var],[f_x[i] for i in range(n)])
+        Fp = lambdify([Var],[dF[i] for i in range(n*n)])
+        Fpp = lambdify([Var],[ddF[i] for i in range(n*n*n)])
+        Q = lambdify([Var],[Qvec[i] for i in range(n*n)])
+
+        drift_array = lambda x : np.array(F(x))
+        def myDrift(vec,t):
+            X = vec[0:n]
+            V = np.array(vec[n:2*n])
+            W = np.array(vec[2*n:]).reshape((n,n))
+            dX = F(X)
+            A = np.array(Fp(X)).reshape((n,n))
+            B = np.array(Fpp(X)).reshape((n,n,n))
+            Qm = np.array(Q(X)).reshape((n,n))
+            dV = np.tensordot(A,V,1) + np.tensordot(B,W,2)/2
+            AW = np.tensordot(A,W,1)
+            dW = AW + AW.transpose() + Qm
+            dXVW = np.zeros(2*n+n*n)
+            dXVW[0:n] = dX
+            dXVW[n:2*n] = dV
+            dXVW[2*n:]  = dW.reshape(n*n)
+            return(dXVW)
+        XVW0 = np.zeros((2*n+n*n))
+        XVW0[0:n] = self._x0
+        
+        T = np.linspace(0,time,number_of_steps)
+        t = ti.time()
+        X = integrate.odeint( lambda x,t : drift_array(x), self._x0, T)
+        print('Time ODE',ti.time()-t); t=ti.time()
+        XVW = integrate.odeint( myDrift, XVW0, T)
+        print('Time ODE RMF',ti.time()-t); t=ti.time()
+        return(T,X,XVW)
+        
+
     def theoretical_V(self, symbolic_differentiation=True):
         """This code computes the constant "V" of Theorem~1 of https://hal.inria.fr/hal-01622054/document 
         
@@ -249,7 +311,9 @@ class DDPP():
         for l in range(number_transitions):
             v = [self._list_of_transitions[l][variables[p]] for p in range(dim)]
             Q += np.kron(v,v).reshape(dim,dim)*self._list_of_rate_functions[l](fixedPoint)
+
         W = scipy.linalg.solve_continuous_lyapunov(A,Q)
+        #print(W)
         A_inv=numpy.linalg.inv(A)
         BtimesW = [sum(np.array([[B[j][k_1][k_2]*W[k_1][k_2] 
                            for k_2 in range(dim)] 
@@ -258,7 +322,6 @@ class DDPP():
         V=[ 0.5*sum([A_inv[i][j]* BtimesW[j] for j in range(dim)]) 
             for i in range(dim)]
         V = np.sum(V,1)
-
         # We now attemps to reconstruct the full C if the number of dimensions was reduced. 
         if dim < n :
             newV = np.zeros(n)
