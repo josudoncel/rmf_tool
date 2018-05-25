@@ -54,4 +54,17 @@ def loadTransientSimu(N,rho,initial_number_of_jobs,nb_samples=100):
     print('average over ',myData['nb_samples'],'simulations')
     return(Tsimu,Y)
 
-    
+
+def loadDistributionQueueLength(N,d,rho):
+    fileName = 'JSQd_simulate/results/exp_rho{0}_d{1}_N{2}'.format(
+        dir_path,int(100*rho),d,N)
+    means = np.mean(np.array(pd.read_csv(fileName,sep=' '))[:,1:-1],0)
+    return(means)
+
+def loadAverageQueueLength(N,d,rho):
+    fileName = 'JSQd_simulate/results/exp_rho{0}_d{1}_N{2}'.format(
+        dir_path,int(100*rho),d,N)
+    means = np.sum(np.array(pd.read_csv(fileName,sep=' '))[:,1:-1],1)
+    var = np.sqrt(np.var(means)/len(means))
+    #print('var=',var)
+    return(np.mean(means))
