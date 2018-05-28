@@ -7,9 +7,9 @@ path = os.path.abspath(__file__)
 dir_path = os.path.dirname(path)
 os.system('cd {} && make simulate_JSQ'.format(dir_path))
 
-def simulateAverageTraj(N,rho,initial_number_of_jobs,nb_samples):
-    fileName = '{}/traj/averageTraj_N{}_r{}_init{}.npz'.format(
-        dir_path,N,int(rho*100),int(initial_number_of_jobs*10))
+def simulateAverageTraj(N,d,rho,initial_number_of_jobs,nb_samples):
+    fileName = '{}/traj/averageTraj_N{}_d{}_r{}_init{}.npz'.format(
+        dir_path,N,d,int(rho*100),int(initial_number_of_jobs*10))
     t = time()
     if os.path.exists(fileName):
         loadedFile=np.load(fileName)
@@ -24,23 +24,23 @@ def simulateAverageTraj(N,rho,initial_number_of_jobs,nb_samples):
         nb_samples_already_computed=0
         x=np.zeros((N*300,20))
     for i in range(nb_samples_already_computed,nb_samples):
-        os.system('{0}/simulate_JSQ N{1} r{2} t{3} > {0}/traj/tmpFile'.format(
-            dir_path,N,rho,initial_number_of_jobs))
+        os.system('{0}/simulate_JSQ N{1} d{2} r{3} t{4} > {0}/traj/tmpFile'.format(
+            dir_path,N,d,rho,initial_number_of_jobs))
         y=np.array(pd.read_csv('{}/traj/tmpFile'.format(dir_path),sep=' ',dtype=np.float64))[:,:-1]
         x+=y
         if ((i+1) % 100==0):
-            print('\rCompleted:{}/{}, rho={},N={}, estimated remaining time={:.0f}sec'.format(
-                i+1,nb_samples,rho,N,
+            print('\rCompleted:{}/{}, rho={},N={},d={}, estimated remaining time={:.0f}sec'.format(
+                i+1,nb_samples,rho,N,d,
                 (nb_samples-i)/(i-nb_samples_already_computed)*(time()-t))
                   ,end='')
-    print('\rCompleted:{}/{}, rho={},N={}, total time={:.0f}sec{}'.format(
-                nb_samples,nb_samples,rho,N, (time()-t),'                    '))
-    np.savez(fileName,x=x,nb_samples=max(nb_samples,nb_samples_already_computed))
+    print('\rCompleted:{}/{}, rho={},N={},d={} total time={:.0f}sec{}'.format(
+        nb_samples,nb_samples,rho,N,d, (time()-t),'                    '))
+    np.savez_compressed(fileName,x=x,nb_samples=max(nb_samples,nb_samples_already_computed))
 
 
-def loadTransientSimu(N,rho,initial_number_of_jobs,nb_samples=100):
-    fileName='{}/traj/averageTraj_N{}_r{}_init{}.npz'.format(
-        dir_path,N,int(rho*100),int(10*initial_number_of_jobs))
+def loadTransientSimu(N,d,rho,initial_number_of_jobs,nb_samples=100):
+    fileName='{}/traj/averageTraj_N{}_d{}_r{}_init{}.npz'.format(
+        dir_path,N,d,int(rho*100),int(10*initial_number_of_jobs))
     if not os.path.exists(fileName) :
         print('No data file found : we need to simulate')
         simulateAverageTraj(N,rho,initial_number_of_jobs,nb_samples)
