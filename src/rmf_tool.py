@@ -7,6 +7,8 @@ import numpy.linalg
 import matplotlib.pyplot as plt
 from sympy.utilities.lambdify import lambdify
 
+from src.refinedRefined_transientRegime import drift_r_vector, drift_rr_vector # To plot the transient trajectories 
+
 import time as ti
 
 class RmfError(Exception):
@@ -202,63 +204,94 @@ class DDPP():
         return(np.array(B))
 
 
-    def refinedTransient(self,time,number_of_steps=1000):
+    def refinedTransient(self,order=1,time=10):
         """
         
-        Returns : (T,X,XVW), where T is a time interval, X the solution of the ODE, XVW is a 2d+d^2 vector. 
-
+        Returns : (T,XVW) or (T,XVWABCD), where T is a time interval and XVW is a (2d+d^2)*number_of_steps matrix (or XVWABCD is a (3n+2n^2+n^3+n^4) x number_of_steps matrix)
+        
+        XVW[0:n,:]                 is the solution of the ODE (= mean field approximation)
+        XVW[n:2*n,:]               is V(t) (= 1st order correction)
+        XVW[2*n:2*n+n**2,:]        is W(t)
+        XVWABCD[2*n+n**2,3*n+n**2] is A(t) (= the 2nd order correction)
+        
         """
-        n = self._model_dimension
-        number_transitions = len(self._list_of_transitions)
 
-        # First we compute 'lambdified version' of Fp, Fpp and Q. 
-        Var=np.array([sym.symbols('x_{}'.format(i)) for i in range(n)])
-        f_x=np.zeros(n)
-        for l in range(number_transitions):
-            f_x = f_x + self._list_of_transitions[l]*self._list_of_rate_functions[l](Var)
-        
-        dF = np.array([[sym.diff(f_x[i],Var[j]) for j in range(n)] for i in range(n)]).reshape((n**2))
-        ddF = np.array([[sym.diff(f_x[i],Var[j],Var[k]) for j in range(n) for k in range(n)] for i in range(n)]).reshape((n**3))
-        Q = [[0 for i in range(n)] for j in range(n)]
-        for l in range(number_transitions):
-            for i in range(n):
-                for j in range(n):
-                    Q[i][j] +=  (self._list_of_transitions[l][i]*self._list_of_transitions[l][j]
-                                 *self._list_of_rate_functions[l](Var))
-        Qvec = np.array(Q).reshape((n*n))
-        
-        F = lambdify([Var],[f_x[i] for i in range(n)])
-        Fp = lambdify([Var],[dF[i] for i in range(n*n)])
-        Fpp = lambdify([Var],[ddF[i] for i in range(n*n*n)])
-        Q = lambdify([Var],[Qvec[i] for i in range(n*n)])
+        n=len(self._list_of_transitions[0])
+        number_of_transitions = len(self._list_of_transitions)
+        x = [sym.symbols('x[{}]'.format(i)) for i in range(n)]
 
-        drift_array = lambda x : np.array(F(x))
-        def myDrift(vec,t):
-            X = vec[0:n]
-            V = np.array(vec[n:2*n])
-            W = np.array(vec[2*n:]).reshape((n,n))
-            dX = F(X)
-            A = np.array(Fp(X)).reshape((n,n))
-            B = np.array(Fpp(X)).reshape((n,n,n))
-            Qm = np.array(Q(X)).reshape((n,n))
-            dV = np.tensordot(A,V,1) + np.tensordot(B,W,2)/2
-            AW = np.tensordot(A,W,1)
-            dW = AW + AW.transpose() + Qm
-            dXVW = np.zeros(2*n+n*n)
-            dXVW[0:n] = dX
-            dXVW[n:2*n] = dV
-            dXVW[2*n:]  = dW.reshape(n*n)
-            return(dXVW)
-        XVW0 = np.zeros((2*n+n*n))
-        XVW0[0:n] = self._x0
+        # We first defines the function that will be used to compute the drift (using symbolic computation)
+        f=np.zeros(n)
+        for l in range(number_of_transitions):
+            f = f + self._list_of_transitions[l]*self._list_of_rate_functions[l](x)
+        dF = np.array([[sym.diff(f[i],x[j]) for j in range(n)] for i in range(n)]).reshape((n**2))
+        ddF = np.array([[sym.diff(f[i],x[j],x[k]) for j in range(n) for k in range(n)] for i in range(n)]).reshape((n**3))
+        q = np.zeros((n**2))
+        for l in range(number_of_transitions):
+            q = q + np.kron(self._list_of_transitions[l],self._list_of_transitions[l])*self._list_of_rate_functions[l](x)
         
-        T = np.linspace(0,time,number_of_steps)
-        t = ti.time()
-        X = integrate.odeint( lambda x,t : drift_array(x), self._x0, T)
-        print('Time ODE',ti.time()-t); t=ti.time()
-        XVW = integrate.odeint( myDrift, XVW0, T)
-        print('Time ODE RMF',ti.time()-t); t=ti.time()
-        return(T,X,XVW)
+        F = sym.lambdify([x],[f[i] for i in range(n)])
+        Fp = sym.lambdify([x],[dF[i] for i in range(n**2)])
+        Fpp = sym.lambdify([x],[ddF[i] for i in range(n**3)])
+        Q = sym.lambdify([x],[q[i] for i in range(n*n)])
+
+        def computeF(x):     return(np.array(F(x)))
+        def computeFp(x):    return(np.array(Fp(x)).reshape( (n,n) ))
+        def computeFpp(x):   return(np.array(Fpp(x)).reshape( (n,n,n) ))
+        def computeQ(x):     return(np.array(Q(x)).reshape( (n,n) ))
+        
+        if order==1:
+            XVW_0 = np.zeros(2*n+n**2)
+            XVW_0[0:n] = self._x0 
+
+            Tmax=time
+            T = np.linspace(0,Tmax,1000)
+
+            numericalInteg = integrate.solve_ivp( lambda t,x : 
+                                                 drift_r_vector(x,n,computeF,computeFp,computeFpp,computeQ), 
+                                                 [0,Tmax], XVW_0,t_eval=T)
+            T = numericalInteg.t
+            XVW = numericalInteg.y
+            return(T,XVW.transpose())
+        
+        elif order==2:
+            dddF = np.array([[sym.diff(f[i],x[j],x[k],x[l]) for j in range(n) for k in range(n) for l in range(n)] 
+                             for i in range(n)]).reshape((n**4))
+            ddddF = np.array([[sym.diff(f[i],x[j],x[k],x[l],x[m]) for j in range(n) for k in range(n) for l in range(n) for m in range(n)] 
+                              for i in range(n)]).reshape((n**5))
+            r = np.zeros((n**3))
+            for l in range(number_of_transitions):
+                r = r + np.kron(self._list_of_transitions[l],np.kron(self._list_of_transitions[l],self._list_of_transitions[l]))*self._list_of_rate_functions[l](x)
+            dQ = np.array( [[[sym.diff(q[i],x[k]) for k in range(n)] for i in range(n**2)]] ).reshape(n**3)
+            ddQ = np.array( [[[sym.diff(q[i],x[k],x[l]) for k in range(n) for l in range(n)] for i in range(n**2)]] ).reshape(n**4)
+            Fppp = sym.lambdify([x],[dddF[i] for i in range(n**4)])
+        
+            Fpppp = sym.lambdify([x],[ddddF[i] for i in range(n**5)])
+            Qp = sym.lambdify([x],[dQ[i] for i in range(n**3)])
+            Qpp = sym.lambdify([x],[ddQ[i] for i in range(n**4)])
+            R = sym.lambdify([x],[r[i] for i in range(n**3)])        
+            def computeFppp(x):  return(np.array(Fppp(x)).reshape( (n,n,n,n) ))
+            def computeFpppp(x): return(np.array(Fpppp(x)).reshape( (n,n,n,n,n) ))
+            def computeQp(x):    return(np.array(Qp(x)).reshape( (n,n,n) ))
+            def computeQpp(x):   return(np.array(Qpp(x)).reshape( (n,n,n,n) ))
+            def computeR(x):     return(np.array(R(x)).reshape( (n,n,n) ))
+        
+
+            XVWABCD_0 = np.zeros(3*n+2*n**2+n**3+n**4)
+            XVWABCD_0[0:n] = self._x0
+            
+            Tmax=time
+            T = np.linspace(0,Tmax,1000)
+
+            numericalInteg = integrate.solve_ivp( lambda t,x : 
+                                                 drift_rr_vector(x,n,computeF,computeFp,computeFpp,computeQ,
+                                                        computeFppp,computeFpppp,computeQp,computeQpp,computeR), 
+                                                 [0,Tmax], XVWABCD_0,t_eval=T)
+            T = numericalInteg.t
+            XVWABCD = numericalInteg.y
+            return(T,XVWABCD.transpose())
+        else:
+            print("order must be 1 (refined of order O(1/N)) or 2 (refined order 1/N^2)")
         
 
     def theoretical_V(self, symbolic_differentiation=True):
