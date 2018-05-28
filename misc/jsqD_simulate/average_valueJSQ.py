@@ -79,12 +79,11 @@ def simulateSteadyState(N,rho,d,nb_samples):
 def loadAllSteadyStateSimu(N,d,rho):
     fileName='{}/steadyState/exp_rho{}_d{}_N{}.npy'.format(dir_path,int(100*rho),d,N)
     if not os.path.exists(fileName):
-        return(simulateSteadyState(N,rho,d,nb_samples=100))
-    else:
-        return(np.load(fileName))
+        simulateSteadyState(N,rho,d,nb_samples=100)
+    return(np.load(fileName)[:,1:])
     
 def loadSteadyStateDistributionQueueLength(N,d,rho,returnConfInterval=False):
-    myFile = loadSteadyStateDistributionQueueLength(N,d,rho)
+    myFile = loadAllSteadyStateSimu(N,d,rho)
     mean = np.mean(myFile,0)
     if not returnConfInterval:
         return(mean)
