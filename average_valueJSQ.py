@@ -55,16 +55,50 @@ def loadTransientSimu(N,rho,initial_number_of_jobs,nb_samples=100):
     return(Tsimu,Y)
 
 
-def loadSteadyStateDistributionQueueLength(N,d,rho):
-    fileName = '{}/results/exp_rho{}_d{}_N{}'.format(
-        dir_path,int(100*rho),d,N)
-    means = np.mean(np.array(pd.read_csv(fileName,sep=' '))[:,1:-1],0)
-    return(means)
+def simulateSteadyState(N,rho,d,nb_samples):
+    fileName = '{}/steadyState/exp_rho{}_d{}_N{}.npy'.format(dir_path,int(100*rho),d,N)
+    if os.path.exists(fileName):
+        my_simulations = np.load(fileName)
+    else:
+        my_simulations = []
+    print(len(my_simulations),'already computed')
+    if len(my_simulations) >= nb_samples:
+        return(my_simulations)
+    else:
+        my_simulations = list(my_simulations)[0:1050]
+        for i in range(len(my_simulations),nb_samples,10):
+            tmpFile = '{0}/steadyState/tmpFile'.format(dir_path)
+            os.system('{0}/simulate_JSQ r{1} d{2} N{3} e10 > {4}'.format(dir_path,rho,d,N,tmpFile))
+            y = list(np.loadtxt(tmpFile))
+            print(y)
+            for x in y:
+                my_simulations.append(x)
+        np.save(fileName,np.array(my_simulations))
+        return(my_simulations)
 
-def loadSteadyStateAverageQueueLength(N,d,rho):
-    fileName = '{}/results/exp_rho{}_d{}_N{}'.format(
-        dir_path,int(100*rho),d,N)
-    means = np.sum(np.array(pd.read_csv(fileName,sep=' '))[:,1:-1],1)
-    var = np.sqrt(np.var(means)/len(means))
-    #print('var=',var)
-    return(np.mean(means))
+def loadAllSteadyStateSimu(N,d,rho):
+    fileName='{}/steadyState/exp_rho{}_d{}_N{}.npy'.format(dir_path,int(100*rho),d,N)
+    if not os.path.exists(fileName):
+        return(simulateSteadyState(N,rho,d,nb_samples=100))
+    else:
+        return(np.load(fileName))
+    
+def loadSteadyStateDistributionQueueLength(N,d,rho,returnConfInterval=False):
+    myFile = loadSteadyStateDistributionQueueLength(N,d,rho)
+    mean = np.mean(myFile,0)
+    if not returnConfInterval:
+        return(mean)
+    else:
+        std = np.sqrt(np.var(myFile,0)/len(myFile))
+        return(mean,std)
+    
+def loadSteadyStateAverageQueueLength(N,d,rho,returnConfInterval=False):
+    myFile = loadAllSteadyStateSimu(N,d,rho)
+    means = np.sum(myFile,1)
+    mean=np.mean(means)
+    if not returnConfInterval:
+        return(mean)
+    else:
+        std = np.sqrt(np.var(means)/len(means))
+        return(mean, std)
+    
