@@ -123,6 +123,7 @@ class DDPP():
         
         T = np.linspace(0,time,number_of_steps)
         X = integrate.odeint( lambda x,t : drift(x), self._x0, T)
+        
         return(T,X)
 
         
@@ -204,15 +205,18 @@ class DDPP():
         return(np.array(B))
 
 
-    def refinedTransient(self,order=1,time=10):
-        """
+    def meanFieldExapansionTransient(self,order=1,time=10):
+        """ Computes the transient values of the mean field approximation or its O(1/N^{order})-expansions
         
-        Returns : (T,XVW) or (T,XVWABCD), where T is a time interval and XVW is a (2d+d^2)*number_of_steps matrix (or XVWABCD is a (3n+2n^2+n^3+n^4) x number_of_steps matrix)
+        Args:
+           - order : can be 0 (mean field approx.), 1 (O(1/N)-expansion) or 2 (O(1/N^2)-expansion)
         
-        XVW[0:n,:]                 is the solution of the ODE (= mean field approximation)
-        XVW[n:2*n,:]               is V(t) (= 1st order correction)
-        XVW[2*n:2*n+n**2,:]        is W(t)
-        XVWABCD[2*n+n**2,3*n+n**2] is A(t) (= the 2nd order correction)
+        Returns : (T,XVW) or (T,XVWABCD), where T is a time interval and XVW is a (2d+d^2)*number_of_steps matrix (or XVWABCD is a (3n+2n^2+n^3+n^4) x number_of_steps matrix), where : 
+        * XVW[0:n,:]                 is the solution of the ODE (= mean field approximation)
+        * XVW[n:2*n,:]               is V(t) (= 1st order correction)
+        * XVW[2*n:2*n+n**2,:]        is W(t)
+        * XVWABCD[2*n+n**2,3*n+n**2] is A(t) (= the 2nd order correction)
+        
         
         """
 
@@ -224,37 +228,24 @@ class DDPP():
         f=np.zeros(n)
         for l in range(number_of_transitions):
             f = f + self._list_of_transitions[l]*self._list_of_rate_functions[l](x)
-        dF = np.array([[sym.diff(f[i],x[j]) for j in range(n)] for i in range(n)]).reshape((n**2))
-        ddF = np.array([[sym.diff(f[i],x[j],x[k]) for j in range(n) for k in range(n)] for i in range(n)]).reshape((n**3))
-        q = np.zeros((n**2))
-        for l in range(number_of_transitions):
-            q = q + np.kron(self._list_of_transitions[l],self._list_of_transitions[l])*self._list_of_rate_functions[l](x)
-        
         F = sym.lambdify([x],[f[i] for i in range(n)])
-        Fp = sym.lambdify([x],[dF[i] for i in range(n**2)])
-        Fpp = sym.lambdify([x],[ddF[i] for i in range(n**3)])
-        Q = sym.lambdify([x],[q[i] for i in range(n*n)])
-
         def computeF(x):     return(np.array(F(x)))
-        def computeFp(x):    return(np.array(Fp(x)).reshape( (n,n) ))
-        def computeFpp(x):   return(np.array(Fpp(x)).reshape( (n,n,n) ))
-        def computeQ(x):     return(np.array(Q(x)).reshape( (n,n) ))
-        
-        if order==1:
-            XVW_0 = np.zeros(2*n+n**2)
-            XVW_0[0:n] = self._x0 
 
-            Tmax=time
-            T = np.linspace(0,Tmax,1000)
-
-            numericalInteg = integrate.solve_ivp( lambda t,x : 
-                                                 drift_r_vector(x,n,computeF,computeFp,computeFpp,computeQ), 
-                                                 [0,Tmax], XVW_0,t_eval=T)
-            T = numericalInteg.t
-            XVW = numericalInteg.y
-            return(T,XVW.transpose())
+        if (order >= 1): # We need 2 derivatives and Q to get the O(1/N)-term
+            dF = np.array([[sym.diff(f[i],x[j]) for j in range(n)] for i in range(n)]).reshape((n**2))
+            ddF = np.array([[sym.diff(f[i],x[j],x[k]) for j in range(n) for k in range(n)] for i in range(n)]).reshape((n**3))
+            q = np.zeros((n**2))
+            for l in range(number_of_transitions):
+                q = q + np.kron(self._list_of_transitions[l],self._list_of_transitions[l])*self._list_of_rate_functions[l](x)
         
-        elif order==2:
+            Fp = sym.lambdify([x],[dF[i] for i in range(n**2)])
+            Fpp = sym.lambdify([x],[ddF[i] for i in range(n**3)])
+            Q = sym.lambdify([x],[q[i] for i in range(n*n)])
+
+            def computeFp(x):    return(np.array(Fp(x)).reshape( (n,n) ))
+            def computeFpp(x):   return(np.array(Fpp(x)).reshape( (n,n,n) ))
+            def computeQ(x):     return(np.array(Q(x)).reshape( (n,n) ))
+        if (order >= 2): # We need the next 2 derivatives of F and Q + the tensor R 
             dddF = np.array([[sym.diff(f[i],x[j],x[k],x[l]) for j in range(n) for k in range(n) for l in range(n)] 
                              for i in range(n)]).reshape((n**4))
             ddddF = np.array([[sym.diff(f[i],x[j],x[k],x[l],x[m]) for j in range(n) for k in range(n) for l in range(n) for m in range(n)] 
@@ -275,8 +266,25 @@ class DDPP():
             def computeQp(x):    return(np.array(Qp(x)).reshape( (n,n,n) ))
             def computeQpp(x):   return(np.array(Qpp(x)).reshape( (n,n,n,n) ))
             def computeR(x):     return(np.array(R(x)).reshape( (n,n,n) ))
-        
 
+        if order==0:
+            X_0 = self._x0
+            Tmax=time
+            T = np.linspace(0,Tmax,1000)
+            numericalInteg = integrate.solve_ivp( lambda t,x : F(x), [0,Tmax], X_0,t_eval=T,rtol=1e-6)
+            return(numericalInteg.t,numericalInteg.y.transpose())
+        if order==1:
+            XVW_0 = np.zeros(2*n+n**2)
+            XVW_0[0:n] = self._x0 
+
+            Tmax=time
+            T = np.linspace(0,Tmax,1000)
+
+            numericalInteg = integrate.solve_ivp( lambda t,x : 
+                                                 drift_r_vector(x,n,computeF,computeFp,computeFpp,computeQ), 
+                                                  [0,Tmax], XVW_0,t_eval=T,rtol=1e-6)
+            return(numericalInteg.t,numericalInteg.y.transpose())        
+        elif order==2:
             XVWABCD_0 = np.zeros(3*n+2*n**2+n**3+n**4)
             XVWABCD_0[0:n] = self._x0
             
@@ -286,12 +294,10 @@ class DDPP():
             numericalInteg = integrate.solve_ivp( lambda t,x : 
                                                  drift_rr_vector(x,n,computeF,computeFp,computeFpp,computeQ,
                                                         computeFppp,computeFpppp,computeQp,computeQpp,computeR), 
-                                                 [0,Tmax], XVWABCD_0,t_eval=T)
-            T = numericalInteg.t
-            XVWABCD = numericalInteg.y
-            return(T,XVWABCD.transpose())
+                                                 [0,Tmax], XVWABCD_0,t_eval=T,rtol=1e-6)
+            return(numericalInteg.t,numericalInteg.y.transpose())        
         else:
-            print("order must be 1 (refined of order O(1/N)) or 2 (refined order 1/N^2)")
+            print("order must be 0 (mean field), 1 (refined of order O(1/N)) or 2 (refined order 1/N^2)")
         
 
     def theoretical_V(self, symbolic_differentiation=True):
