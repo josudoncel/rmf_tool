@@ -205,6 +205,71 @@ class DDPP():
         return(np.array(B))
 
 
+    def defineDrift(self):
+        n=len(self._list_of_transitions[0])
+        number_of_transitions = len(self._list_of_transitions)
+        x = [sym.symbols('x[{}]'.format(i)) for i in range(n)]
+        f=np.zeros(n)
+        for l in range(number_of_transitions):
+            f = f + self._list_of_transitions[l]*self._list_of_rate_functions[l](x)
+        F = sym.lambdify([x],[f[i] for i in range(n)])
+        def computeF(x):     return(np.array(F(x)))
+        return computeF
+    def defineDriftDerivativeQ(self):
+        n=len(self._list_of_transitions[0])
+        number_of_transitions = len(self._list_of_transitions)
+        x = [sym.symbols('x[{}]'.format(i)) for i in range(n)]
+        f=np.zeros(n)
+        for l in range(number_of_transitions):
+            f = f + self._list_of_transitions[l]*self._list_of_rate_functions[l](x)
+        F = sym.lambdify([x],[f[i] for i in range(n)])
+        dF = np.array([[sym.diff(f[i],x[j]) for j in range(n)] for i in range(n)]).reshape((n**2))
+        ddF = np.array([[sym.diff(f[i],x[j],x[k]) for j in range(n) for k in range(n)] for i in range(n)]).reshape((n**3))
+        q = np.zeros((n**2))
+        for l in range(number_of_transitions):
+            q = q + np.kron(self._list_of_transitions[l],self._list_of_transitions[l])*self._list_of_rate_functions[l](x)
+            
+        Fp = sym.lambdify([x],[dF[i] for i in range(n**2)])
+        Fpp = sym.lambdify([x],[ddF[i] for i in range(n**3)])
+        Q = sym.lambdify([x],[q[i] for i in range(n*n)])
+        
+        def computeFp(x):    return(np.array(Fp(x)).reshape( (n,n) ))
+        def computeFpp(x):   return(np.array(Fpp(x)).reshape( (n,n,n) ))
+        def computeQ(x):     return(np.array(Q(x)).reshape( (n,n) ))
+        return( computeFp,computeFpp,computeQ )
+    def defineDriftSecondDerivativeQderivativesR(self):
+        n=len(self._list_of_transitions[0])
+        number_of_transitions = len(self._list_of_transitions)
+        x = [sym.symbols('x[{}]'.format(i)) for i in range(n)]
+        f=np.zeros(n)
+        for l in range(number_of_transitions):
+            f = f + self._list_of_transitions[l]*self._list_of_rate_functions[l](x)
+        dddF = np.array([[sym.diff(f[i],x[j],x[k],x[l]) for j in range(n) for k in range(n) for l in range(n)] 
+                          for i in range(n)]).reshape((n**4))
+        dddF_nonReshaped=dddF.reshape((n,n,n,n))
+        ddddF = np.array([[sym.diff(dddF_nonReshaped[i,j,k,l],x[m]) for j in range(n) for k in range(n) for l in range(n) for m in range(n)] 
+                           for i in range(n)]).reshape((n**5))
+        r = np.zeros((n**3))
+        for l in range(number_of_transitions):
+            r = r + np.kron(self._list_of_transitions[l],np.kron(self._list_of_transitions[l],self._list_of_transitions[l]))*self._list_of_rate_functions[l](x)
+        q = np.zeros((n**2))
+        for l in range(number_of_transitions):
+            q = q + np.kron(self._list_of_transitions[l],self._list_of_transitions[l])*self._list_of_rate_functions[l](x)
+        dQ = np.array( [[[sym.diff(q[i],x[k]) for k in range(n)] for i in range(n**2)]] ).reshape(n**3)
+        ddQ = np.array( [[[sym.diff(q[i],x[k],x[l]) for k in range(n) for l in range(n)] for i in range(n**2)]] ).reshape(n**4)
+
+        Fppp = sym.lambdify([x],[dddF[i] for i in range(n**4)])
+        Fpppp = sym.lambdify([x],[ddddF[i] for i in range(n**5)])
+        Qp = sym.lambdify([x],[dQ[i] for i in range(n**3)])
+        Qpp = sym.lambdify([x],[ddQ[i] for i in range(n**4)])
+        R = sym.lambdify([x],[r[i] for i in range(n**3)])
+        def computeFppp(x):  return(np.array(Fppp(x)).reshape( (n,n,n,n) ))
+        def computeFpppp(x): return(np.array(Fpppp(x)).reshape( (n,n,n,n,n) ))
+        def computeQp(x):    return(np.array(Qp(x)).reshape( (n,n,n) ))
+        def computeQpp(x):   return(np.array(Qpp(x)).reshape( (n,n,n,n) ))
+        def computeR(x):     return(np.array(R(x)).reshape( (n,n,n) ))
+        return(computeFppp,computeFpppp,computeQp,computeQpp,computeR)
+    
     def meanFieldExapansionTransient(self,order=1,time=10):
         """ Computes the transient values of the mean field approximation or its O(1/N^{order})-expansions
         
@@ -219,54 +284,17 @@ class DDPP():
         
         
         """
-
         n=len(self._list_of_transitions[0])
-        number_of_transitions = len(self._list_of_transitions)
-        x = [sym.symbols('x[{}]'.format(i)) for i in range(n)]
-
+        t_start = ti.time()
+        
         # We first defines the function that will be used to compute the drift (using symbolic computation)
-        f=np.zeros(n)
-        for l in range(number_of_transitions):
-            f = f + self._list_of_transitions[l]*self._list_of_rate_functions[l](x)
-        F = sym.lambdify([x],[f[i] for i in range(n)])
-        def computeF(x):     return(np.array(F(x)))
-
+        computeF = self.defineDrift()
         if (order >= 1): # We need 2 derivatives and Q to get the O(1/N)-term
-            dF = np.array([[sym.diff(f[i],x[j]) for j in range(n)] for i in range(n)]).reshape((n**2))
-            ddF = np.array([[sym.diff(f[i],x[j],x[k]) for j in range(n) for k in range(n)] for i in range(n)]).reshape((n**3))
-            q = np.zeros((n**2))
-            for l in range(number_of_transitions):
-                q = q + np.kron(self._list_of_transitions[l],self._list_of_transitions[l])*self._list_of_rate_functions[l](x)
-        
-            Fp = sym.lambdify([x],[dF[i] for i in range(n**2)])
-            Fpp = sym.lambdify([x],[ddF[i] for i in range(n**3)])
-            Q = sym.lambdify([x],[q[i] for i in range(n*n)])
-
-            def computeFp(x):    return(np.array(Fp(x)).reshape( (n,n) ))
-            def computeFpp(x):   return(np.array(Fpp(x)).reshape( (n,n,n) ))
-            def computeQ(x):     return(np.array(Q(x)).reshape( (n,n) ))
+            computeFp,computeFpp,computeQ = self.defineDriftDerivativeQ()
         if (order >= 2): # We need the next 2 derivatives of F and Q + the tensor R 
-            dddF = np.array([[sym.diff(f[i],x[j],x[k],x[l]) for j in range(n) for k in range(n) for l in range(n)] 
-                             for i in range(n)]).reshape((n**4))
-            ddddF = np.array([[sym.diff(f[i],x[j],x[k],x[l],x[m]) for j in range(n) for k in range(n) for l in range(n) for m in range(n)] 
-                              for i in range(n)]).reshape((n**5))
-            r = np.zeros((n**3))
-            for l in range(number_of_transitions):
-                r = r + np.kron(self._list_of_transitions[l],np.kron(self._list_of_transitions[l],self._list_of_transitions[l]))*self._list_of_rate_functions[l](x)
-            dQ = np.array( [[[sym.diff(q[i],x[k]) for k in range(n)] for i in range(n**2)]] ).reshape(n**3)
-            ddQ = np.array( [[[sym.diff(q[i],x[k],x[l]) for k in range(n) for l in range(n)] for i in range(n**2)]] ).reshape(n**4)
-            Fppp = sym.lambdify([x],[dddF[i] for i in range(n**4)])
+            computeFppp,computeFpppp,computeQp,computeQpp,computeR = self.defineDriftSecondDerivativeQderivativesR()
+        print('time to compute drift=',ti.time()-t_start)
         
-            Fpppp = sym.lambdify([x],[ddddF[i] for i in range(n**5)])
-            Qp = sym.lambdify([x],[dQ[i] for i in range(n**3)])
-            Qpp = sym.lambdify([x],[ddQ[i] for i in range(n**4)])
-            R = sym.lambdify([x],[r[i] for i in range(n**3)])        
-            def computeFppp(x):  return(np.array(Fppp(x)).reshape( (n,n,n,n) ))
-            def computeFpppp(x): return(np.array(Fpppp(x)).reshape( (n,n,n,n,n) ))
-            def computeQp(x):    return(np.array(Qp(x)).reshape( (n,n,n) ))
-            def computeQpp(x):   return(np.array(Qpp(x)).reshape( (n,n,n,n) ))
-            def computeR(x):     return(np.array(R(x)).reshape( (n,n,n) ))
-
         if order==0:
             X_0 = self._x0
             Tmax=time
