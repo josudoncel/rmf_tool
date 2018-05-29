@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from sympy.utilities.lambdify import lambdify
 
 from src.refinedRefined_transientRegime import drift_r_vector, drift_rr_vector # To plot the transient trajectories 
+from src.refinedRefined_fixedPoint import computePiV,computePiVA # To plot the transient trajectories 
 
 import time as ti
 
@@ -327,7 +328,37 @@ class DDPP():
         else:
             print("order must be 0 (mean field), 1 (refined of order O(1/N)) or 2 (refined order 1/N^2)")
         
-
+    def meanFieldExapansionSteadyState(self,order=1):
+        """This code computes the O(1/N) and O(1/N^2) expansion of the mean field approximaiton
+        
+        Note : Probably less robust and slower that theoretical_V
+        
+        """
+        pi = self.fixed_point()
+        if order == 0:
+            return pi
+        if (order >= 1): # We need 2 derivatives and Q to get the O(1/N)-term
+            computeFp,computeFpp,computeQ = self.defineDriftDerivativeQ()
+            Fp = computeFp(pi)
+            Fpp = computeFpp(pi)
+            Q = computeQ(pi)
+            if order==1:
+                return(computePiV(pi, Fp,Fpp, Q))
+        if (order >= 2): # We need the next 2 derivatives of F and Q + the tensor R
+            if len(self._x0) >= 9:
+                print("*Warning* The computation time grows quickly with the number of dimensions", 
+                      "(probably around {:1.0f}sec. for this model)".format(0.0001*len(self._x0)**5))
+            computeFppp,computeFpppp,computeQp,computeQpp,computeR = self.defineDriftSecondDerivativeQderivativesR()
+            Fppp = computeFppp(pi)
+            Fpppp = computeFpppp(pi)
+            Qp = computeQp(pi)
+            Qpp = computeQpp(pi)
+            R = computeR(pi)
+            if order==2:
+                return(computePiVA(pi, Fp,Fpp,Fppp,Fpppp, Q,Qp,Qpp, R))
+            else:
+                print('order should be 0, 1 or 2')
+                
     def theoretical_V(self, symbolic_differentiation=True):
         """This code computes the constant "V" of Theorem~1 of https://hal.inria.fr/hal-01622054/document 
         
