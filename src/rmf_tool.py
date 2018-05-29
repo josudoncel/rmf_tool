@@ -404,22 +404,15 @@ class DDPP():
             fixedPointProj = np.array([fixedPoint[variables[i]] for i in range(dim)])
             A = self._numericalJacobian(drift_array,fixedPointProj)
             B = self._numericalHessian(drift_array,fixedPointProj)
-            
+
         Q=np.zeros((dim,dim))
         for l in range(number_transitions):
             v = [self._list_of_transitions[l][variables[p]] for p in range(dim)]
             Q += np.kron(v,v).reshape(dim,dim)*self._list_of_rate_functions[l](fixedPoint)
 
         W = scipy.linalg.solve_continuous_lyapunov(A,Q)
-        #print(W)
-        A_inv=numpy.linalg.inv(A)
-        BtimesW = [sum(np.array([[B[j][k_1][k_2]*W[k_1][k_2] 
-                           for k_2 in range(dim)] 
-                          for k_1 in range(dim)])) for j in range(dim)]
-                
-        V=[ 0.5*sum([A_inv[i][j]* BtimesW[j] for j in range(dim)]) 
-            for i in range(dim)]
-        V = np.sum(V,1)
+        V = np.tensordot(scipy.linalg.inv(A),np.tensordot(B,W/2,2),1)
+
         # We now attemps to reconstruct the full C if the number of dimensions was reduced. 
         if dim < n :
             newV = np.zeros(n)
