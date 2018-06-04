@@ -5,6 +5,8 @@ import sympy as sym
 import scipy.linalg 
 import numpy.linalg
 import matplotlib.pyplot as plt
+
+from numpy import tensordot as tsdot
 from sympy.utilities.lambdify import lambdify
 from sympy import derive_by_array
     
@@ -159,7 +161,7 @@ class DDPP():
             if sum(l) != 0:
                 return False
         return(True)
-
+    
     def dimensionReduction(self,A):
         """When the 
         
@@ -196,7 +198,6 @@ class DDPP():
         return(computeFp(pi),computeFpp(pi),computeQ(pi))
 
     def theoreticalV_new(self):
-        #A,B,Q = self.computeABQ()
         pi = self.fixed_point()
         A,B,Q = self.defineDriftDerivativeQ(evaluate_at=pi)
         C,Cinv, rank=self.dimensionReduction(A)
@@ -204,10 +205,9 @@ class DDPP():
         Ap = (C@A@Cinv)[0:rank,0:rank]
         Qp = (C@Q@C.transpose())[0:rank,0:rank]
         Wp = scipy.linalg.solve_continuous_lyapunov(Ap,Qp)
-        Bp = np.tensordot(np.tensordot(C,B,1), Cinv,1)
-        Bp = np.tensordot(np.transpose(Bp,axes=[0,2,1]), Cinv,1) [0:rank,0:rank,0:rank]
-        V  = scipy.linalg.inv(Ap) @ np.tensordot(Bp,Wp/2,2)
-        return(Cinv[:,0:rank]@V)
+        Bp = tsdot(tsdot(tsdot(C,B,1), Cinv,1),Cinv,axes=[[1],[0]]) [0:rank,0:rank,0:rank]
+        V  = Cinv[:,0:rank]@ (scipy.linalg.inv(Ap) @ tsdot(Bp,Wp/2,2))
+        return(V)
     
     def test_for_linear_dependencies(self):
         """This function tests if there the transition conserve some subset of the space. 
@@ -424,6 +424,36 @@ class DDPP():
             return(numericalInteg.t,numericalInteg.y.transpose())        
         else:
             print("order must be 0 (mean field), 1 (refined of order O(1/N)) or 2 (refined order 1/N^2)")
+
+    def reduceDimensionFpFppQ(self,Fp,Fpp,Q):
+        P,Pinv, rank=self.dimensionReduction(Fp)
+        
+        Fp = (P@Fp@Pinv)[0:rank,0:rank]
+        Fpp = tsdot(tsdot(tsdot(P,Fpp,1), Pinv,1),Pinv,axes=[[1],[0]])[0:rank,0:rank,0:rank]
+        Q = (P@Q@P.transpose())[0:rank,0:rank]
+        return(Fp,Fpp,Q, P, Pinv,rank)
+
+    def expandDimensionVW(self,V,W,Pinv):
+        rank = len(V)
+        return(Pinv[:,0:rank]@ V, Pinv[:,0:rank]@W@Pinv.transpose()[0:rank,:])
+
+    def reduceDimensionFppFppppQpQppR(self, Fppp,Fpppp,Qp,Qpp,R,P,Pinv,rank):
+        Fppp = tsdot(tsdot(tsdot(tsdot(P,Fppp,1), Pinv,1),Pinv,axes=[[1],[0]]),Pinv,axes=[[2],[0]])[0:rank,0:rank,0:rank,0:rank]
+        Fpppp = tsdot(tsdot(tsdot(tsdot(tsdot(P,Fpppp,1), Pinv,1),Pinv,axes=[[1],[0]]),Pinv,axes=[[2],[0]]),Pinv,axes=[[3],[0]])[0:rank,0:rank,0:rank,0:rank,0:rank]
+        Qp = tsdot(tsdot(tsdot(P,Qp,1),P.transpose(),axes=[[1],[0]]),Pinv,axes=[[2],[0]])[0:rank,0:rank,0:rank]
+        Qpp0 = tsdot(tsdot(P,Qpp,1),P.transpose(),axes=[[1],[0]])
+        Qpp1 = tsdot(Qpp0,Pinv,axes=[[2],[0]])
+        Qpp= tsdot(Qpp1,Pinv,axes=1)[0:rank,0:rank,0:rank,0:rank]
+        R = tsdot(tsdot(tsdot(P,R,1),P.transpose(),axes=[[1],[0]]),P.transpose(),1)[0:rank,0:rank,0:rank]
+        print('rank=',rank,Fppp.shape,Fpppp.shape,Qp.shape,Qpp.shape,R.shape)
+        return(Fppp,Fpppp,Qp,Qpp,R)
+        
+    def expandDimensionABCD(self,A,B,C,D,Pinv):
+        rank = len(A)
+        Pinv=Pinv[:,0:rank]
+        return(Pinv@A, Pinv@B@Pinv.transpose(),
+               tsdot(tsdot(tsdot(C,Pinv,axes=[[2],[1]]),Pinv,axes=[[1],[1]]),Pinv,axes=[[0],[1]]),
+               tsdot(tsdot(tsdot(tsdot(D,Pinv,axes=[[3],[1]]),Pinv,axes=[[2],[1]]),Pinv,axes=[[1],[1]]),Pinv,axes=[[0],[1]]))
         
     def meanFieldExapansionSteadyState(self,order=1):
         """This code computes the O(1/N) and O(1/N^2) expansion of the mean field approximaiton
@@ -436,17 +466,22 @@ class DDPP():
             return pi
         if (order >= 1): # We need 2 derivatives and Q to get the O(1/N)-term
             Fp,Fpp,Q = self.defineDriftDerivativeQ(evaluate_at=pi)
+            Fp,Fpp,Q, P,Pinv,rank = self.reduceDimensionFpFppQ(Fp,Fpp,Q)
             if order==1:
-                return(computePiV(pi, Fp,Fpp, Q))
+                pi,V,(V,W) = computePiV(pi, Fp,Fpp, Q)
+                V,W = self.expandDimensionVW(V,W,Pinv)
+                return(pi,V,(V,W))
         if (order >= 2): # We need the next 2 derivatives of F and Q + the tensor R
             if len(self._x0) >= 11:
                 print("*Warning* The computation time grows quickly with the number of dimensions", 
                       "(probably around {:1.0f}sec. for this model)".format(0.0001*len(self._x0)**5))
             Fppp,Fpppp,Qp,Qpp,R = self.defineDriftSecondDerivativeQderivativesR(evaluate_at=pi)
-            if order==2:
-                return(computePiVA(pi, Fp,Fpp,Fppp,Fpppp, Q,Qp,Qpp, R))
-            else:
-                print('order should be 0, 1 or 2')
+            Fppp,Fpppp,Qp,Qpp,R = self.reduceDimensionFppFppppQpQppR(Fppp,Fpppp,Qp,Qpp,R,P,Pinv,rank)
+            pi,V,A,(V,W,A,B,C,D) = computePiVA(pi, Fp,Fpp,Fppp,Fpppp, Q,Qp,Qpp, R)
+            V,W = self.expandDimensionVW(V,W,Pinv)
+            A,B,C,D = self.expandDimensionABCD(A,B,C,D,Pinv)
+            if order==2: return(pi,V,A,(V,W,A,B,C,D))
+            else:  print('order should be 0, 1 or 2')
                 
     def theoretical_V(self, symbolic_differentiation=True):
         """This code computes the constant "V" of Theorem~1 of https://hal.inria.fr/hal-01622054/document 
@@ -500,7 +535,7 @@ class DDPP():
             Q += np.kron(v,v).reshape(dim,dim)*self._list_of_rate_functions[l](fixedPoint)
 
         W = scipy.linalg.solve_continuous_lyapunov(A,Q)
-        V = np.tensordot(scipy.linalg.inv(A),np.tensordot(B,W/2,2),1)
+        V = tsdot(scipy.linalg.inv(A),tsdot(B,W/2,2),1)
 
         # We now attemps to reconstruct the full C if the number of dimensions was reduced. 
         if dim < n :
