@@ -64,6 +64,10 @@ def computeA(Fp,Fpp,Fppp,Fpppp,B,C,D):
     return(-np.tensordot(inv(Fp),FppB/2+FpppC/6+FppppD/24,1) )
 
 def computePiV(pi, Fp,Fpp, Q):
+    """ Returns the constants V and W (1/N-term for the steady-state)
+    
+    This function assumes that Fp is invertible.
+    """
     W = computeW(Fp,Q)
     V = computeV(Fp,Fpp,W)
     return(pi,V, (V,W))
