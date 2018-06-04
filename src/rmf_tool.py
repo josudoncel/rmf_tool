@@ -6,12 +6,25 @@ import scipy.linalg
 import numpy.linalg
 import matplotlib.pyplot as plt
 from sympy.utilities.lambdify import lambdify
+from sympy import derive_by_array
+    
+
 
 from src.refinedRefined_transientRegime import drift_r_vector, drift_rr_vector # To plot the transient trajectories 
 from src.refinedRefined_fixedPoint import computePiV,computePiVA # To plot the transient trajectories 
 
 import time as ti
 
+def eval_array_at(F,subs):
+    """ evaluate an array of 'symbolic' expression using the dictionary 'subs'. 
+    
+    Returns : an Array of float
+    """
+    myF = F.flatten()
+    myF = np.array([float(f.evalf(subs=subs)) for f in myF])
+    return(myF.reshape(F.shape))
+
+    
 class RmfError(Exception):
     """Basic error class for this module
     """
@@ -147,6 +160,55 @@ class DDPP():
                 return False
         return(True)
 
+    def dimensionReduction(self,A):
+        """When the 
+        
+        """
+        n = len(A)
+        M = np.array([l for l in self._list_of_transitions])
+        rank_of_transisions=np.linalg.matrix_rank(M)
+        # If rank_of_transisions < n, this means that the stochastic process
+        # evolves on a linear subspace of R^n. 
+        eigenvaluesOfJacobian = scipy.linalg.eig(A,left=False,right=False)
+        rank_of_jacobian = np.linalg.matrix_rank(A)
+        if sum(numpy.real(eigenvaluesOfJacobian) < 1e-8) < rank_of_transisions:
+            # This means that there are less than "rank_of_transisions" eigenvalues with <0 real part
+            print("The Jacobian seems to be not Hurwitz")
+        if  rank_of_jacobian == n:
+            return(np.eye(n),np.eye(n),n)
+        C = np.zeros((n,n))
+        n = len(A)
+        d = 0
+        rank_of_previous_submatrix = 0
+        for i in range(n):
+            rank_of_next_submatrix = np.linalg.matrix_rank(A[0:i+1,0:i+1])
+            if  rank_of_next_submatrix > rank_of_previous_submatrix:
+                C[d,i] = 1
+                d+=1
+            rank_of_previous_submatrix = rank_of_next_submatrix
+        U,s,V = scipy.linalg.svd(A)
+        C[rank_of_jacobian:,:] = U.transpose()[rank_of_jacobian:,:]
+        return(C,scipy.linalg.inv(C),rank_of_jacobian)
+
+    def computeABQ(self):
+        pi = self.fixed_point()
+        computeFp,computeFpp,computeQ = self.defineDriftDerivativeQ()
+        return(computeFp(pi),computeFpp(pi),computeQ(pi))
+
+    def theoreticalV_new(self):
+        #A,B,Q = self.computeABQ()
+        pi = self.fixed_point()
+        A,B,Q = self.defineDriftDerivativeQ(evaluate_at=pi)
+        C,Cinv, rank=self.dimensionReduction(A)
+        
+        Ap = (C@A@Cinv)[0:rank,0:rank]
+        Qp = (C@Q@C.transpose())[0:rank,0:rank]
+        Wp = scipy.linalg.solve_continuous_lyapunov(Ap,Qp)
+        Bp = np.tensordot(np.tensordot(C,B,1), Cinv,1)
+        Bp = np.tensordot(np.transpose(Bp,axes=[0,2,1]), Cinv,1) [0:rank,0:rank,0:rank]
+        V  = scipy.linalg.inv(Ap) @ np.tensordot(Bp,Wp/2,2)
+        return(Cinv[:,0:rank]@V)
+    
     def test_for_linear_dependencies(self):
         """This function tests if there the transition conserve some subset of the space. 
         
@@ -206,7 +268,11 @@ class DDPP():
         return(np.array(B))
 
 
-    def defineDrift(self):
+    def defineDrift(self,evaluate_at=None):
+        """Return a (lambdified) function F(.) that is the drift of the system
+
+        Arg : evaluate_at=None : if not None, return the value of the drift at point "evaluate_at".
+        """
         n=len(self._list_of_transitions[0])
         number_of_transitions = len(self._list_of_transitions)
         x = [sym.symbols('x[{}]'.format(i)) for i in range(n)]
@@ -216,29 +282,50 @@ class DDPP():
         F = sym.lambdify([x],[f[i] for i in range(n)])
         def computeF(x):     return(np.array(F(x)))
         return computeF
-    def defineDriftDerivativeQ(self):
+
+    def defineDriftDerivativeQ(self,evaluate_at=None):
+        """Return three (lambdified) functions Fp(.), Fpp(.) and Q(.) that are the first two derivatives of the drift and the matrix Q. 
+
+        Arg : evaluate_at=None : if not None, return the value of the functions evaluated at point "evaluate_at".
+        """
         n=len(self._list_of_transitions[0])
         number_of_transitions = len(self._list_of_transitions)
         x = [sym.symbols('x[{}]'.format(i)) for i in range(n)]
         f=np.zeros(n)
         for l in range(number_of_transitions):
             f = f + self._list_of_transitions[l]*self._list_of_rate_functions[l](x)
-        F = sym.lambdify([x],[f[i] for i in range(n)])
-        dF = np.array([[sym.diff(f[i],x[j]) for j in range(n)] for i in range(n)]).reshape((n**2))
-        ddF = np.array([[sym.diff(f[i],x[j],x[k]) for j in range(n) for k in range(n)] for i in range(n)]).reshape((n**3))
+        dF = np.array([[sym.diff(f[i],x[j]) for j in range(n)] for i in range(n)])
+        ddF = np.array([[[sym.diff(dF[i,j],x[k]) for j in range(n)]for k in range(n)] for i in range(n)])
+
+        if evaluate_at is not None:
+            subs_dictionary = {x[i]:evaluate_at[i] for i in range(n)}
+            Fp = eval_array_at(dF,subs_dictionary)
+            Fpp = eval_array_at(ddF,subs_dictionary)
+            Q = np.zeros((n**2))
+            for l in range(number_of_transitions):
+                Q = Q + np.kron(self._list_of_transitions[l],self._list_of_transitions[l])*self._list_of_rate_functions[l](evaluate_at)
+            return(Fp,Fpp,Q.reshape((n,n)))
+
         q = np.zeros((n**2))
         for l in range(number_of_transitions):
             q = q + np.kron(self._list_of_transitions[l],self._list_of_transitions[l])*self._list_of_rate_functions[l](x)
             
-        Fp = sym.lambdify([x],[dF[i] for i in range(n**2)])
-        Fpp = sym.lambdify([x],[ddF[i] for i in range(n**3)])
+        Fp = sym.lambdify([x],list(dF.reshape(n**2)))
+        Fpp = sym.lambdify([x],list(ddF.reshape((n**3))))
         Q = sym.lambdify([x],[q[i] for i in range(n*n)])
         
         def computeFp(x):    return(np.array(Fp(x)).reshape( (n,n) ))
         def computeFpp(x):   return(np.array(Fpp(x)).reshape( (n,n,n) ))
         def computeQ(x):     return(np.array(Q(x)).reshape( (n,n) ))
         return( computeFp,computeFpp,computeQ )
-    def defineDriftSecondDerivativeQderivativesR(self):
+    
+
+    
+    def defineDriftSecondDerivativeQderivativesR(self,evaluate_at=None):
+        """Return three (lambdified) functions Fppp(.), Fpppp(.) and Q(.) that are the 3rd and 4th derivatives of the drift, the first two derivatives of Q(.) and the matrix R(.)
+        
+        Arg : evaluate_at=None : if not None, return the value of the functions evaluated at point "evaluate_at".
+        """
         n=len(self._list_of_transitions[0])
         number_of_transitions = len(self._list_of_transitions)
         x = [sym.symbols('x[{}]'.format(i)) for i in range(n)]
@@ -259,6 +346,16 @@ class DDPP():
         dQ = np.array( [[[sym.diff(q[i],x[k]) for k in range(n)] for i in range(n**2)]] ).reshape(n**3)
         ddQ = np.array( [[[sym.diff(q[i],x[k],x[l]) for k in range(n) for l in range(n)] for i in range(n**2)]] ).reshape(n**4)
 
+        if evaluate_at is not None:
+            subs_dictionary = {x[i]:evaluate_at[i] for i in range(n)}
+            Fppp = eval_array_at(dddF.reshape((n,n,n,n)),subs_dictionary)
+            Fpppp = eval_array_at(ddddF.reshape((n,n,n,n,n)),subs_dictionary)
+            Qp = eval_array_at(dQ.reshape((n,n,n)),subs_dictionary)
+            Qpp = eval_array_at(ddQ.reshape((n,n,n,n)),subs_dictionary)
+            R = eval_array_at(r.reshape((n,n,n)),subs_dictionary)
+            print('*** NOT TESTED!!! ***')
+            return(Fppp,Fpppp,Qp,Qpp,R)
+        
         Fppp = sym.lambdify([x],[dddF[i] for i in range(n**4)])
         Fpppp = sym.lambdify([x],[ddddF[i] for i in range(n**5)])
         Qp = sym.lambdify([x],[dQ[i] for i in range(n**3)])
@@ -338,22 +435,14 @@ class DDPP():
         if order == 0:
             return pi
         if (order >= 1): # We need 2 derivatives and Q to get the O(1/N)-term
-            computeFp,computeFpp,computeQ = self.defineDriftDerivativeQ()
-            Fp = computeFp(pi)
-            Fpp = computeFpp(pi)
-            Q = computeQ(pi)
+            Fp,Fpp,Q = self.defineDriftDerivativeQ(evaluate_at=pi)
             if order==1:
                 return(computePiV(pi, Fp,Fpp, Q))
         if (order >= 2): # We need the next 2 derivatives of F and Q + the tensor R
-            if len(self._x0) >= 9:
+            if len(self._x0) >= 11:
                 print("*Warning* The computation time grows quickly with the number of dimensions", 
                       "(probably around {:1.0f}sec. for this model)".format(0.0001*len(self._x0)**5))
-            computeFppp,computeFpppp,computeQp,computeQpp,computeR = self.defineDriftSecondDerivativeQderivativesR()
-            Fppp = computeFppp(pi)
-            Fpppp = computeFpppp(pi)
-            Qp = computeQp(pi)
-            Qpp = computeQpp(pi)
-            R = computeR(pi)
+            Fppp,Fpppp,Qp,Qpp,R = self.defineDriftSecondDerivativeQderivativesR(evaluate_at=pi)
             if order==2:
                 return(computePiVA(pi, Fp,Fpp,Fppp,Fpppp, Q,Qp,Qpp, R))
             else:
