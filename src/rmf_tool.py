@@ -438,15 +438,19 @@ class DDPP():
         return(Pinv[:,0:rank]@ V, Pinv[:,0:rank]@W@Pinv.transpose()[0:rank,:])
 
     def reduceDimensionFppFppppQpQppR(self, Fppp,Fpppp,Qp,Qpp,R,P,Pinv,rank):
+        FpppOLD = Fppp
+        FppppOLD = Fpppp
+        QpOLD = Qp
         Fppp = tsdot(tsdot(tsdot(tsdot(P,Fppp,1), Pinv,1),Pinv,axes=[[1],[0]]),Pinv,axes=[[2],[0]])[0:rank,0:rank,0:rank,0:rank]
         Fpppp = tsdot(tsdot(tsdot(tsdot(tsdot(P,Fpppp,1), Pinv,1),Pinv,axes=[[1],[0]]),Pinv,axes=[[2],[0]]),Pinv,axes=[[3],[0]])[0:rank,0:rank,0:rank,0:rank,0:rank]
-        Qp = tsdot(tsdot(tsdot(P,Qp,1),P.transpose(),axes=[[1],[0]]),Pinv,axes=[[2],[0]])[0:rank,0:rank,0:rank]
-        Qpp0 = tsdot(tsdot(P,Qpp,1),P.transpose(),axes=[[1],[0]])
-        Qpp1 = tsdot(Qpp0,Pinv,axes=[[2],[0]])
-        Qpp= tsdot(Qpp1,Pinv,axes=1)[0:rank,0:rank,0:rank,0:rank]
+        print(Qp,P,Pinv)
+        Qp_new = np.transpose(tsdot(tsdot(P,np.transpose(Qp,axes=[0,2,1]),1),P.transpose(),1),axes=[0,2,1])
+        Qp_final = tsdot(Qp_new,Pinv,1)[0:rank,0:rank,0:rank]
+        Qpp_new = np.transpose(tsdot(tsdot(P,np.transpose(Qpp,axes=[0,3,2,1]),1),P.transpose(),1),axes=[0,3,2,1])
+        Qpp = tsdot(tsdot(Qpp_new,Pinv,axes=[[2],[0]]),Pinv,axes=[[3],[0]])[0:rank,0:rank,0:rank,0:rank]
         R = tsdot(tsdot(tsdot(P,R,1),P.transpose(),axes=[[1],[0]]),P.transpose(),1)[0:rank,0:rank,0:rank]
-        print('rank=',rank,Fppp.shape,Fpppp.shape,Qp.shape,Qpp.shape,R.shape)
-        return(Fppp,Fpppp,Qp,Qpp,R)
+        print(Qp,QpOLD-Qp)
+        return(Fppp,Fpppp,Qp_final,Qpp,R)
         
     def expandDimensionABCD(self,A,B,C,D,Pinv):
         rank = len(A)
