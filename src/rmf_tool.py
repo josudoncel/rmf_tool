@@ -192,23 +192,6 @@ class DDPP():
         C[rank_of_jacobian:,:] = U.transpose()[rank_of_jacobian:,:]
         return(C,scipy.linalg.inv(C),rank_of_jacobian)
 
-    def computeABQ(self):
-        pi = self.fixed_point()
-        computeFp,computeFpp,computeQ = self.defineDriftDerivativeQ()
-        return(computeFp(pi),computeFpp(pi),computeQ(pi))
-
-    def theoreticalV_new(self):
-        pi = self.fixed_point()
-        A,B,Q = self.defineDriftDerivativeQ(evaluate_at=pi)
-        C,Cinv, rank=self.dimensionReduction(A)
-        
-        Ap = (C@A@Cinv)[0:rank,0:rank]
-        Qp = (C@Q@C.transpose())[0:rank,0:rank]
-        Wp = scipy.linalg.solve_continuous_lyapunov(Ap,Qp)
-        Bp = tsdot(tsdot(tsdot(C,B,1), Cinv,1),Cinv,axes=[[1],[0]]) [0:rank,0:rank,0:rank]
-        V  = Cinv[:,0:rank]@ (scipy.linalg.inv(Ap) @ tsdot(Bp,Wp/2,2))
-        return(V)
-    
     def test_for_linear_dependencies(self):
         """This function tests if there the transition conserve some subset of the space. 
         
@@ -367,7 +350,7 @@ class DDPP():
         def computeR(x):     return(np.array(R(x)).reshape( (n,n,n) ))
         return(computeFppp,computeFpppp,computeQp,computeQpp,computeR)
     
-    def meanFieldExapansionTransient(self,order=1,time=10):
+    def meanFieldExpansionTransient(self,order=1,time=10):
         """ Computes the transient values of the mean field approximation or its O(1/N^{order})-expansions
         
         Args:
@@ -378,8 +361,6 @@ class DDPP():
         * XVW[n:2*n,:]               is V(t) (= 1st order correction)
         * XVW[2*n:2*n+n**2,:]        is W(t)
         * XVWABCD[2*n+n**2,3*n+n**2] is A(t) (= the 2nd order correction)
-        
-        
         """
         n=len(self._list_of_transitions[0])
         t_start = ti.time()
@@ -408,7 +389,10 @@ class DDPP():
             numericalInteg = integrate.solve_ivp( lambda t,x : 
                                                  drift_r_vector(x,n,computeF,computeFp,computeFpp,computeQ), 
                                                   [0,Tmax], XVW_0,t_eval=T,rtol=1e-6)
-            return(numericalInteg.t,numericalInteg.y.transpose())        
+            XVW = numericalInteg.y.transpose()
+            X = XVW[:,0:n]
+            V = XVW[:,n:2*n]
+            return(numericalInteg.t,X,V,XVW)
         elif order==2:
             XVWABCD_0 = np.zeros(3*n+2*n**2+n**3+n**4)
             XVWABCD_0[0:n] = self._x0
@@ -420,13 +404,16 @@ class DDPP():
                                                  drift_rr_vector(x,n,computeF,computeFp,computeFpp,computeQ,
                                                         computeFppp,computeFpppp,computeQp,computeQpp,computeR), 
                                                  [0,Tmax], XVWABCD_0,t_eval=T,rtol=1e-6)
-            return(numericalInteg.t,numericalInteg.y.transpose())        
+            XVWABCD = numericalInteg.y.transpose()
+            X = XVWABCD[:,0:n]
+            V = XVWABCD[:,n:2*n]
+            A = XVWABCD[:,2*n+n**2:3*n+n**2]
+            return(numericalInteg.t,X,V,A,XVWABCD)
         else:
             print("order must be 0 (mean field), 1 (refined of order O(1/N)) or 2 (refined order 1/N^2)")
 
     def reduceDimensionFpFppQ(self,Fp,Fpp,Q):
         P,Pinv, rank=self.dimensionReduction(Fp)
-        
         Fp = (P@Fp@Pinv)[0:rank,0:rank]
         Fpp = tsdot(tsdot(tsdot(P,Fpp,1), Pinv,1),Pinv,axes=[[1],[0]])[0:rank,0:rank,0:rank]
         Q = (P@Q@P.transpose())[0:rank,0:rank]
@@ -456,8 +443,8 @@ class DDPP():
                tsdot(tsdot(tsdot(C,Pinv,axes=[[2],[1]]),Pinv,axes=[[1],[1]]),Pinv,axes=[[0],[1]]),
                tsdot(tsdot(tsdot(tsdot(D,Pinv,axes=[[3],[1]]),Pinv,axes=[[2],[1]]),Pinv,axes=[[1],[1]]),Pinv,axes=[[0],[1]]))
         
-    def meanFieldExapansionSteadyState(self,order=1):
-        """This code computes the O(1/N) and O(1/N^2) expansion of the mean field approximaiton
+    def meanFieldExpansionSteadyState(self,order=1):
+        """This code computes the O(1/N) and O(1/N^2) expansion of the mean field approximaiton (the term "V" is the "V" of Theorem~1 of https://hal.inria.fr/hal-01622054/document. 
         
         Note : Probably less robust and slower that theoretical_V
         
@@ -483,11 +470,13 @@ class DDPP():
             A,B,C,D = self.expandDimensionABCD(A,B,C,D,Pinv)
             if order==2: return(pi,V,A,(V,W,A,B,C,D))
             else:  print('order should be 0, 1 or 2')
-                
+    
     def theoretical_V(self, symbolic_differentiation=True):
         """This code computes the constant "V" of Theorem~1 of https://hal.inria.fr/hal-01622054/document 
         
         Note : for now this function does not support rates that depend on N (i.e. C=0)
+        
+        This function is deprecated (meanFieldExpansionSteadyState(order=1) should be called instead) 
 
         Args: 
             symbolic_differentiation (bool, default=True) : when True, the derivative are computed using Sympy. When false, they are computed using a finite difference method. 
