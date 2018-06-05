@@ -353,7 +353,6 @@ class DDPP():
             Qp = eval_array_at(dQ.reshape((n,n,n)),subs_dictionary)
             Qpp = eval_array_at(ddQ.reshape((n,n,n,n)),subs_dictionary)
             R = eval_array_at(r.reshape((n,n,n)),subs_dictionary)
-            print('*** NOT TESTED!!! ***')
             return(Fppp,Fpppp,Qp,Qpp,R)
         
         Fppp = sym.lambdify([x],[dddF[i] for i in range(n**4)])
@@ -443,13 +442,11 @@ class DDPP():
         QpOLD = Qp
         Fppp = tsdot(tsdot(tsdot(tsdot(P,Fppp,1), Pinv,1),Pinv,axes=[[1],[0]]),Pinv,axes=[[2],[0]])[0:rank,0:rank,0:rank,0:rank]
         Fpppp = tsdot(tsdot(tsdot(tsdot(tsdot(P,Fpppp,1), Pinv,1),Pinv,axes=[[1],[0]]),Pinv,axes=[[2],[0]]),Pinv,axes=[[3],[0]])[0:rank,0:rank,0:rank,0:rank,0:rank]
-        print(Qp,P,Pinv)
         Qp_new = np.transpose(tsdot(tsdot(P,np.transpose(Qp,axes=[0,2,1]),1),P.transpose(),1),axes=[0,2,1])
         Qp_final = tsdot(Qp_new,Pinv,1)[0:rank,0:rank,0:rank]
         Qpp_new = np.transpose(tsdot(tsdot(P,np.transpose(Qpp,axes=[0,3,2,1]),1),P.transpose(),1),axes=[0,3,2,1])
         Qpp = tsdot(tsdot(Qpp_new,Pinv,axes=[[2],[0]]),Pinv,axes=[[3],[0]])[0:rank,0:rank,0:rank,0:rank]
         R = tsdot(tsdot(tsdot(P,R,1),P.transpose(),axes=[[1],[0]]),P.transpose(),1)[0:rank,0:rank,0:rank]
-        print(Qp,QpOLD-Qp)
         return(Fppp,Fpppp,Qp_final,Qpp,R)
         
     def expandDimensionABCD(self,A,B,C,D,Pinv):
