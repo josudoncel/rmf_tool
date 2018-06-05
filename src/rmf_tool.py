@@ -397,7 +397,7 @@ class DDPP():
             X_0 = self._x0
             Tmax=time
             T = np.linspace(0,Tmax,1000)
-            numericalInteg = integrate.solve_ivp( lambda t,x : F(x), [0,Tmax], X_0,t_eval=T,rtol=1e-6)
+            numericalInteg = integrate.solve_ivp( lambda t,x : computeF(x), [0,Tmax], X_0,t_eval=T,rtol=1e-6)
             return(numericalInteg.t,numericalInteg.y.transpose())
         if order==1:
             XVW_0 = np.zeros(2*n+n**2)
