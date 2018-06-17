@@ -11,9 +11,14 @@ from sympy.utilities.lambdify import lambdify
 from sympy import derive_by_array
     
 
+import os, sys
+path = os.path.abspath(__file__)
+dir_path = os.path.dirname(path)
+sys.path.append(dir_path)
 
-from src.refinedRefined_transientRegime import drift_r_vector, drift_rr_vector # To plot the transient trajectories 
-from src.refinedRefined_fixedPoint import computePiV,computePiVA # To plot the transient trajectories 
+# To compute the transient trajectories and fixed points 
+from refinedRefined_transientRegime import drift_r_vector, drift_rr_vector
+from refinedRefined_fixedPoint import computePiV,computePiVA
 
 import time as ti
 
