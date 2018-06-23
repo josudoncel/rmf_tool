@@ -7,9 +7,14 @@ path = os.path.abspath(__file__)
 dir_path = os.path.dirname(path)
 os.system('cd {} && make simulate_JSQ'.format(dir_path))
 
-def simulateAverageTraj(N,d,rho,initial_number_of_jobs,nb_samples):
-    fileName = '{}/traj/averageTraj_N{}_d{}_r{}_init{}.npz'.format(
+def fileNameFromParametersTransient(N,rho,d,initial_number_of_jobs):
+    return '{}/traj/averageTraj_N{}_d{}_r{}_init{}.npz'.format(
         dir_path,N,d,int(rho*100),int(initial_number_of_jobs*10))
+def fileNameFromParametersSteadyState(N,rho,d):
+    return '{}/steadyState/exp_rho{}_d{}_N{}.npy'.format(dir_path,int(100*rho),d,N)
+    
+def simulateAverageTraj(N,rho,d,initial_number_of_jobs,nb_samples):
+    fileName = fileNameFromParametersTransient(N,rho,d,initial_number_of_jobs)
     t = time()
     if os.path.exists(fileName):
         loadedFile=np.load(fileName)
@@ -24,8 +29,8 @@ def simulateAverageTraj(N,d,rho,initial_number_of_jobs,nb_samples):
         nb_samples_already_computed=0
         x=np.zeros((N*300,20))
     for i in range(nb_samples_already_computed,nb_samples):
-        os.system('{0}/simulate_JSQ N{1} d{2} r{3} t{4} > {0}/traj/tmpFile'.format(
-            dir_path,N,d,rho,initial_number_of_jobs))
+        os.system('{0}/simulate_JSQ N{1} r{2} d{3} t{4} > {0}/traj/tmpFile'.format(
+            dir_path,N,rho,d,initial_number_of_jobs))
         y=np.array(pd.read_csv('{}/traj/tmpFile'.format(dir_path),sep=' ',dtype=np.float64))[:,:-1]
         x+=y
         if ((i+1) % 100==0):
@@ -35,18 +40,18 @@ def simulateAverageTraj(N,d,rho,initial_number_of_jobs,nb_samples):
                   ,end='')
     print('\rCompleted:{}/{}, rho={},N={},d={} total time={:.0f}sec{}'.format(
         nb_samples,nb_samples,rho,N,d, (time()-t),'                    '))
+    print(fileName)
     np.savez_compressed(fileName,x=x,nb_samples=max(nb_samples,nb_samples_already_computed))
 
 
-def loadTransientSimu(N,d,rho,initial_number_of_jobs,nb_samples=100):
-    fileName='{}/traj/averageTraj_N{}_d{}_r{}_init{}.npz'.format(
-        dir_path,N,d,int(rho*100),int(10*initial_number_of_jobs))
+def loadTransientSimu(N,rho,d,initial_number_of_jobs,nb_samples=100):
+    fileName = fileNameFromParametersTransient(N,rho,d,initial_number_of_jobs)
     if not os.path.exists(fileName) :
         print('No data file found : we need to simulate')
-        simulateAverageTraj(N,rho,initial_number_of_jobs,nb_samples)
+        simulateAverageTraj(N,rho,d,initial_number_of_jobs,nb_samples)
     myData = np.load(fileName)
     if myData['nb_samples'] < nb_samples:
-        simulateAverageTraj(N,rho,initial_number_of_jobs,nb_samples)
+        simulateAverageTraj(N,rho,d,initial_number_of_jobs,nb_samples)
         myData = np.load(fileName)
     
     Y = myData['x']/myData['nb_samples']
@@ -56,7 +61,7 @@ def loadTransientSimu(N,d,rho,initial_number_of_jobs,nb_samples=100):
 
 
 def simulateSteadyState(N,rho,d,nb_samples):
-    fileName = '{}/steadyState/exp_rho{}_d{}_N{}.npy'.format(dir_path,int(100*rho),d,N)
+    fileName = fileNameFromParametersSteadyState(N,rho,d)
     if os.path.exists(fileName):
         my_simulations = np.load(fileName)
     else:
@@ -76,14 +81,14 @@ def simulateSteadyState(N,rho,d,nb_samples):
         np.save(fileName,np.array(my_simulations))
         return(my_simulations)
 
-def loadAllSteadyStateSimu(N,d,rho):
-    fileName='{}/steadyState/exp_rho{}_d{}_N{}.npy'.format(dir_path,int(100*rho),d,N)
+def loadAllSteadyStateSimu(N,rho,d):
+    fileName = fileNameFromParametersSteadyState(N,rho,d) 
     if not os.path.exists(fileName):
         simulateSteadyState(N,rho,d,nb_samples=100)
     return(np.load(fileName)[:,1:])
     
-def loadSteadyStateDistributionQueueLength(N,d,rho,returnConfInterval=False):
-    myFile = loadAllSteadyStateSimu(N,d,rho)
+def loadSteadyStateDistributionQueueLength(N,rho,d,returnConfInterval=False):
+    myFile = loadAllSteadyStateSimu(N,rho,d)
     mean = np.mean(myFile,0)
     if not returnConfInterval:
         return(mean)
@@ -91,8 +96,8 @@ def loadSteadyStateDistributionQueueLength(N,d,rho,returnConfInterval=False):
         std = np.sqrt(np.var(myFile,0)/len(myFile))
         return(mean,std)
     
-def loadSteadyStateAverageQueueLength(N,d,rho,returnConfInterval=False):
-    myFile = loadAllSteadyStateSimu(N,d,rho)
+def loadSteadyStateAverageQueueLength(N,rho,d,returnConfInterval=False):
+    myFile = loadAllSteadyStateSimu(N,rho,d)
     means = np.sum(myFile,1)
     mean=np.mean(means)
     if not returnConfInterval:
