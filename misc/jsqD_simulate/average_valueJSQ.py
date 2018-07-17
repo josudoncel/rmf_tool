@@ -75,14 +75,13 @@ def simulateSteadyState(N,rho,d,nb_samples):
             tmpFile = '{0}/steadyState/tmpFile'.format(dir_path)
             os.system('{0}/simulate_JSQ r{1} d{2} N{3} e10 > {4}'.format(dir_path,rho,d,N,tmpFile))
             y = list(np.loadtxt(tmpFile))
-            print(y)
             for x in y:
                 my_simulations.append(x)
         np.save(fileName,np.array(my_simulations))
         return(my_simulations)
 
 def loadAllSteadyStateSimu(N,rho,d):
-    fileName = fileNameFromParametersSteadyState(N,rho,d) 
+    fileName = fileNameFromParametersSteadyState(N,rho,d)
     if not os.path.exists(fileName):
         simulateSteadyState(N,rho,d,nb_samples=100)
     return(np.load(fileName)[:,1:])
