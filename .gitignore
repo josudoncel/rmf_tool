@@ -1,3 +1,11 @@
+# local files
+simulate_JSQ
+tmpFile
+sir_simu
+tmp_N*
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
